@@ -1513,3 +1513,9 @@ qemux86-64:/home# afm-util install self_app.wgt
 ERROR:  failed installation failed: File exists
 ---> mit HVAC arbeiten und "entkernen"
 
+5.3.
+self_QML.wgt testen  ---> vorher fehlt vermutlich binding
+qemux86-64:/home# systemctl start afm-appli-self_qml--0.1--main@0.service
+Failed to start afm-appli-self_qml--0.1--main@0.service: Unit afm-api-self_QML@0.service not found ---> auf qemu kann ich nicht ws-server.js laufen lassen, also binding selbst schreiben !
+
+
