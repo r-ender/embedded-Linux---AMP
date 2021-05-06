@@ -1,0 +1,11 @@
+[Unit]
+Description=Provides api HVAC for user %i
+X-AFM-API-TYPE=ws
+Requires=afm-user-setup@%i.service
+After=afm-user-setup@%i.service
+Requires=afm-api-HVAC@%i.socket
+After=afm-api-HVAC@%i.socket
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/true

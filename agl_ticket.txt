@@ -1,0 +1,1821 @@
+7.12. 
+download und extract von Kernel and ready qemu-image in ~/agl/build
+navigate ~/agl/build
+ausführen des befehls:
+
+//apt-get install qemu-system-x86_64
+
+(sleep 5 && vinagre --vnc-scale localhost ) > /tmp/vinagre.log 2>&1 & qemu-system-x86_64 -device virtio-net-pci,netdev=net0,mac=52:54:00:12:35:02 -netdev user,id=net0,hostfwd=tcp::2222-:22 -drive file=agl-demo-platform-crosssdk-qemux86-64.ext4,if=virtio,format=raw -show-cursor -usb -device usb-tablet -device virtio-rng-pci -snapshot -vga virtio -vnc :0 -soundhw hda -machine q35 -cpu kvm64 -cpu qemu64,+ssse3,+sse4.1,+sse4.2,+popcnt -enable-kvm -m 2048 -serial mon:vc -serial mon:stdio -serial null -kernel bzImage -append 'root=/dev/vda rw console=tty0 mem=2048M ip=dhcp oprofile.timer=1 console=ttyS0,115200n8 verbose fstab=no'
+
+dann startet EMU und ich kann mich einloggen über "root"
+
+sdk-folder erstellt und sdk-skript dort gespeichert
+sudo chmod 777 poky-agl-glibc-x86_64-agl-demo-platform-crosssdk-corei7-64-qemux86-64-toolchain-10.90.0+snapshot.sh
+$ mkdir agl-sdk
+$ ./poky-agl-glibc-x86_64-agl-demo-platform-crosssdk-corei7-64-qemux86-64-toolchain-10.90.0+snapshot.sh
+./poky-agl-glibc-x86_64-agl-demo-platform-crosssdk-corei7-64-qemux86-64-toolchain-10.90.0+snapshot.sh: 29: gcc: not found
+Automotive Grade Linux SDK installer version 10.90.0+snapshot
+=============================================================
+Enter target directory for SDK (default: /opt/agl-sdk/10.90.0+snapshot-corei7-64): /home/cloud/agl/sdk
+You are about to install the SDK to "/home/cloud/agl/sdk". Proceed [Y/n]? Y
+Extracting SDK..........................................................................................................................................done
+Setting it up...done
+SDK has been successfully set up and is ready to be used.
+Each time you wish to use the SDK in a new shell session, you need to source the environment setup script e.g.
+ $ . /home/cloud/agl/sdk/environment-setup-corei7-64-agl-linux
+ source /home/cloud/agl/sdk/environment-setup-corei7-64-agl-linux
+ 
+ 17.12.:
+ https://docs.automotivelinux.org/en/master/#0_Getting_Started/1_Quickstart/Using_Ready_Made_Images/
+ 
+ Creating new application:
+ https://docs.automotivelinux.org/en/master/#3_Developer_Guides/3_Creating_a_New_Application/
+ 
+ example:
+ https://github.com/iotbzh/helloworld-native-application
+ 
+ clone git into agl/apps with: git clone --recursive https://github.com/iotbzh/helloworld-native-application.git
+ 
+ bei autobuild/agl/autobuild tauchte Fehler auf:
+ /usr/bin/make: bad interpreter: No such file or directory
+ 
+ Vorlagen aus hello-world app kopieren und in eigenen SDK folder ablegen, danach builden und abändern
+ z.B.:	cp ../../../apps/helloworld-native-application/conf.d/wgt/config.xml.in .
+ 
+https://docs.automotivelinux.org/en/master/#3_Developer_Guides/3_Creating_a_New_Application/
+
+ich komme bis "cmake .." aber habe noch kein passendes CMakeLists.txt file parat, mal schaun ob ich da eins adaptieren kann
+
+links:
+https://iot.bzh/download/public/2016/sdk/
+
+https://agl-docs.readthedocs.io/en/master-ivory/0_Getting_Started/1_Welcome/Overview/
+
+
+for yocto related stuff concerning sdk/Eclipse etc.: https://www.yoctoproject.org/docs/2.4.4/sdk-manual/sdk-manual.html
+
+
+Zum Verständnis:
+Ein Service ist ein background-process der Bindings über zB D-Bus oder REST-API http zur Verfügung stellt, die "Native application" ist eine compiled application in C/C++, HTML,Qt die einen 
+oder mehrere Services aufruft
+Am häufigsten wird hybrid application verwendet, Mischung aus Frontend+Backend
+
+Für den Test des iotbzh-pdf: written in C and uses the “libafbwsc” helper library availablein the app-framework-binder source tree on AGL Gerrit
+
+Es bestehen Fragezeichen, welche Board-IP ich als Qemu verwenden solle und wie ich SSH da reinbekomme.
+
+zum Einloggen/kopieren usw. nach QEMU nach folgendem Schema: ssh root@localhost -p2222 cat /etc/os-release
+
+oder:
+export BOARDIP='localhost -p2222'
+ssh root@$BOARDIP cat /etc/os-release
+
+installieren von cmake und make
+
+~/agl/iot_test/app-framework-templates/templates/service/build$ make
+
+
+ich versuche über Anpassung von xxx-service-binding den Fehler zu eruieren
+
+nur in afb-binding version 1 und 2: #define afb_event_drop			afb_event_x1_unref !!!
+
+in pred-defr unter version2 eingefügt: #define afb_binding_interface		afb_binding_interface_v1
+
+
+--> alles manuell umzustellen von v1 ist aufwendig, evtl besser Weg standard auf Version 3 und Rest dann ausbessern ?!
+
+--> bei native application geht Beispiel problemlos
+
+scp -P 2222 xxxxxx-native.wgt root@localhost:/home
+
+in qemu:
+qemux86-64:/home# afm-util install xxxxxx-native.wgt 
+qemux86-64:/home# afm-util list
+
+agl-service-bluetooth.wgt unter user/agl/apps
+
+ein paar Sache vom Manual stimmen nicht überein, evtl ältere version verwenden wie angezeigt im Manual?: 
+VERSION="1.0+snapshot-20160717 (master)"VERSION_ID="1.0+snapshot-20160717"PRETTY_NAME="Automotive Grade Linux 1.0+snapshot-20160717 (master)"
+
+aktuell verwendet:VERSION="10.90.0+snapshot-20201204 (koi)"
+VERSION_ID=10.90.0-snapshot-20201204
+PRETTY_NAME="Automotive Grade Linux 10.90.0+snapshot-20201204 (koi)"
+---> aber das ist nur die Plattform, hat evtl nichts mit dem Service-Beispiel zu tun ?
+
+
+<  WICHTIG: sourcen von environment-script sonst kommt folgender Fehler 
+
+die packages json-c und afb-daemon müssen noch installiert werden für build von hybrid-qml
+---> sudo apt-get install libjson-c-dev
+---> "sudo apt-get install agl-app-framework-binder-dev" klappt nicht
+>
+
+Zum Thema Binder:
+http://old-docs.automotivelinux.org/docs/en/guppy/apis_services/reference/af-binder/afb-binding-writing.html
+
+auch das vorgefertigte hybrid-qml gibt Fehler aus bei make --> am besten einen eigenen binder programmieren nach dem Vorbild von obigem link
+writing a binding = adding an API
+The binder makes no distinctions between upper case and lower case latin letters, so API/VERB matches Api/Verb or api/verb
+
+$ pkg-config --cflags-only-I afb-daemon -I/home/cloud/agl/sdk/sysroots/corei7-64-agl-linux/usr/include/json-c
+
+zum Compilen: gcc -fPIC -shared binding-tut1.c -o binding-tut1.so $(pkg-config --cflags-only-I afb-daemon) -I/home/cloud/agl/sdk/sysroots/corei7-64-agl-linux/usr/include/
+
+Fehler beim ausführen von afb-dameon binding-tut1.so in QEMU,
+Lösungsvorschlag: 
+Hello,
+
+quick reply before going away: try to package the mqtt shared object
+library in the lib/ subdirectory of the widget together with your
+binding.
+
+Good Week-end
+Best regards
+José
+
+example for tictasctoe afb_binding: https://github.com/iotbzh/webdocs-sample/blob/master/site/docs/architecture/en/dev/reference/ap/binder/afb-bindings-writing.md
+----> ~/agl/binder_selftest/app-framework-binder/
+
+Schritte zur installation von afb-daemon, genau befolgen:
+download tarball zu libmicrohttpd und befolge die Anweisungen in INSTALL-Dokument innerhalb einer frischen ungesourcten Konsole
+src/include/microhttpd.h 
+libmicrohttpd isntalliert mit ./configure - make - sudo make install
+
+wechseln in ordner "app-framework-binder", das git-repo ist downloadbar unter https://git.automotivelinux.org/src/app-framework-binder
+Hier das README-File befolgen
+
+	$ git clone https://git.automotivelinux.org/src/app-framework-binder
+	$ cd app-framework-binder
+	$ mkdir build
+	$ cd build
+	$ cmake -DCMAKE_INSTALL_PREFIX=$HOME/local ..
+	$ make install
+
+test unter ./src/afb-daemon
+(executable kann man dann in /usr/sbin kopieren: sudo cp afb-daemon /usr/sbin)
+
+output, teilweise Tutorials: -- Installing: /home/cloud/local/share/af-binder/bindings/samples/tic-tac-toe.so
+
+zum Test:
+AFB_DAEMON_DIR="/home/cloud/agl/binder_selftest/app-framework-binder"
+./afb-daemon --port=1234 --token='' --ldpaths=${AFB_DAEMON_DIR}/build --workdir=/tmp --rootdir=${AFB_DAEMON_DIR}/test
+
+or from other folder: ./build/src/afb-daemon --port=1234 --token='' --ldpaths=${AFB_DAEMON_DIR}/build --workdir=/tmp --rootdir=${AFB_DAEMON_DIR}/test
+the slash "/" must not be forgotten!
+
+to execute binding-tut1:	afb-daemon --binding binding-tut1.so --port 3333 --token '' 
+
+< list all environment variables: printenv >
+
+
+~/agl/binder_selftest/app-framework-binder$ ./build/src/afb-daemon --binding ./binding-tut1.so --port 1234 --token ''
+ERROR: binding [binding-tut1.so] not loadable: binding-tut1.so: cannot open shared object file: No such file or directory [/home/cloud/agl/binder_selftest/app-framework-binder/src/afb-api-so.c:97,load_binding]
+ERROR: can't start the binding binding-tut1.so [/home/cloud/agl/binder_selftest/app-framework-binder/src/main-afb-daemon.c:178,apiset_start_list] 
+
+jetzt klappts: ~/agl/binder_selftest/app-framework-binder$ ./build/src/afb-daemon --verbose --binding ./binding-tut1.so --port 2223 --token ''
+NOTICE: API monitor starting...
+NOTICE: API tuto-1 starting...
+NOTICE: Serving rootdir=. uploaddir=.
+NOTICE: Listening interface *:2223
+NOTICE: Browser URL= http://localhost:2223
+
+
+
+
+4.1.21
+Binding tutorials: https://github.com/growupboron/AGL-GSoD-2020-Demo-MkDocs/blob/master/docs/guppy/apis_services/reference/af-binder/afb-binding-writing.md
+
+after working through tutorials, create tic-tac-toe.c example: https://github.com/iotbzh/webdocs-sample/blob/master/site/docs/architecture/en/dev/reference/ap/binder/afb-bindings-writing.md
+
+now: program tutorial2 and debug a bit with it to get a feeling.
+Test of binding-tut2.c:
+Terminal 1:
+./build/src/afb-daemon --verbose --binding ./binding-tut2.so --port 4444 --token ''
+NOTICE: [API binding-tut2] preinit
+NOTICE: API binding-tut2 starting...
+NOTICE: [API binding-tut2] init
+NOTICE: API monitor starting...
+NOTICE: Serving rootdir=. uploaddir=.
+NOTICE: Listening interface *:4444
+NOTICE: Browser URL= http://localhost:4444
+ERROR: [REQ/API binding-tut2] login, bad request: (null) [binding-tut2.c:17,login]
+ERROR: [REQ/API binding-tut2] login, bad request: { "help": true } [binding-tut2.c:17,login]
+NOTICE: [REQ/API binding-tut2] login user: jose
+NOTICE: Granting permission urn:AGL:token:valid by default of backend
+NOTICE: [REQ/API binding-tut2] login user: orlando_cool
+NOTICE: Granting permission urn:AGL:token:valid by default of backend
+ERROR: [REQ/API binding-tut2] login, bad state, logout first [binding-tut2.c:20,login]
+NOTICE: Granting permission urn:AGL:token:valid by default of backend
+NOTICE: [REQ/API binding-tut2] action for user jose: { "subscribe": true }
+NOTICE: [REQ/API binding-tut2] user jose subscribes to events
+NOTICE: [REQ/API binding-tut2] action for user orlando_cool: { "subscribe": false }
+NOTICE: [REQ/API binding-tut2] user orlando_cool unsubscribes to events
+
+
+
+Terminal2:
+./afb-client-demo -H localhost:4444/api?token=toto
+binding-tut2 login
+ON-REPLY 1:binding-tut2/login: ERROR
+{
+  "jtype":"afb-reply",
+  "request":{
+    "status":"bad-request"
+  }
+}
+{"help":true}    
+verb missing, bad line: ogin
+binding-tut2 login {"help":true}
+ON-REPLY 2:binding-tut2/login: ERROR
+{
+  "jtype":"afb-reply",
+  "request":{
+    "status":"bad-request"
+  }
+}
+tuto-2 login {"user":"jose","password":"please"}
+ON-REPLY 3:tuto-2/login: ERROR
+{
+  "jtype":"afb-reply",
+  "request":{
+    "status":"unknown-api",
+    "info":"api tuto-2 not found (for verb login)"
+  }
+}
+binding-tut2 login {"user":"jose", "password":"please"}
+ON-REPLY 4:binding-tut2/login: OK
+{
+  "jtype":"afb-reply",
+  "request":{
+    "status":"success"
+  }
+}
+
+binding-tut2 login {"user":"orlando2", "password":"please"}
+ON-REPLY 5:binding-tut2/login: ERROR
+{
+  "jtype":"afb-reply",
+  "request":{
+    "status":"bad-state"
+  }
+}
+binding-tut2 action {"subscribe":true}
+ON-REPLY 6:binding-tut2/action: OK
+{
+  "response":{
+    "subscribe":true
+  },
+  "jtype":"afb-reply",
+  "request":{
+    "status":"success"
+  }
+}
+
+binding-tut2 action {"subscribe":false}
+ON-REPLY 6:binding-tut2/action: OK
+{
+  "response":{
+    "subscribe":false
+  },
+  "jtype":"afb-reply",
+  "request":{
+    "status":"success"
+  }
+}
+
+
+
+Terminal 3:
+./afb-client-demo -H localhost:4444/api?token=
+inding-tut2 login {"user":"jose", "password":"please"}
+ON-REPLY 1:inding-tut2/login: ERROR
+{
+  "jtype":"afb-reply",
+  "request":{
+    "status":"unknown-api",
+    "info":"api inding-tut2 not found (for verb login)"
+  }
+}
+binding-tut2 login {"user":"orlando_cool", "password":"please"}
+ON-REPLY 2:binding-tut2/login: OK
+{
+  "jtype":"afb-reply",
+  "request":{
+    "status":"success"
+  }
+}
+
+
+für erstes Tutorial: /afb-client-demo -H localhost:4444/api?token=
+binding-tut1 login {"user":"orlando","password":"please"}
+ON-REPLY 2:binding-tut1/login: ERROR
+{
+  "jtype":"afb-reply",
+  "request":{
+    "status":"unknown-api",
+    "info":"api binding-tut1 not found (for verb login)"
+  }
+}
+tuto-1 login
+ON-REPLY 3:tuto-1/login: ERROR
+{
+  "jtype":"afb-reply",
+  "request":{
+    "status":"unknown-verb",
+    "info":"verb login unknown within api tuto-1"
+  }
+}
+tuto-1 hello
+ON-REPLY 4:tuto-1/hello: OK
+{
+  "jtype":"afb-reply",
+  "request":{
+    "status":"success",
+    "info":"hello world"
+  }
+}
+
+
+Fazit -----------------------------------> die Bindings erreicht man über die im source-file gesetzten Namen für API und die Verbs, die wiederum callbacks aufrufen, 
+						was letztlich die eigentlichen Funktionen sind 
+						
+						
+						
+						
+Binding!
+A binding is an independent piece of software. A binding is self contain and exposes application logic as sharable library (---> *.so)  A binding is intended to be dynamically loaded by afb-daemon
+to expose application API ( --binding ./xyz.so) . Technically, a binder binding does not reference and is not linked with any afb-daemon library.
+
+Application binder supports two kinds of bindings: application bindings and service bindings. Technically both class of bindings are equivalent and use the same coding convention. Only sharing mode
+and security context diverge.
+
+Application-bindings implement the glue between application's UI and services. Every AGL application has a corresponding binder that typically activates one or many bindings to interface the
+application logic with lower platform services. When an application is started by the AGL application framework, a dedicated binder is started that loads/activates application binding(s).
+
+Service-bindings enable API activation within corresponding service security context and not within calling application context. Service-bindings are intended to run as a unique instance. Service
+bindings can be shared between multiple clients. Sharing may either be global to the platform (ie: GPS service) or dedicated to a given user (ie: user preferences)
+
+
+Application and service bindings are loaded and activated each time a new afb-daemon is started. At launch time, every loaded binding initialises itself. If a single binding initialisation fail
+corresponding instance of afb-daemon self aborts. Conversely, when a binding initialisation succeeds, it should register its unique name as well as the list of verbs attached to the methods it
+exposes.
+
+Afb-daemon parses URI requests to extract the API(binding name) and the VERB(method to activate). As an example, URI foo/bar translates to binding named foo and method named bar. Afb-daemon ignores
+letter case when parsing URI. Thus TicTacToe/Board and tictactoe/board are equivalent.
+
+tic-tac-toe unter ~/agl/binder_selftest/app-framework-binder/bindings/samples aber ich versuche es nach dem Tutorial zu entwickeln: https://github.com/iotbzh/webdocs-sample/blob/master/site/docs/architecture/en/dev/reference/ap/binder/afb-bindings-writing.md
+
+
+8.1.
+erstes auf qemu kopiertes widget bzw. app installiert: 
+qemux86-64:/home# afm-util install annex.wgt 
+{
+  "added":"webapps-annex"
+}
+
+qemux86-64:/home# afm-util info webapps-annex
+{
+  "description":"Reversi/Othello",
+  "name":"Annex",
+  "shortname":"",
+  "id":"webapps-annex",
+  "version":"0.0.10",
+  "author":"Todd Brandt <todd.e.brandt@intel.com>",
+  "author-email":"",
+  "width":"",
+  "height":"",
+  "icon":"/var/local/lib/afm/applications/webapps-annex/icon_128.png",
+  "http-port":30044
+}
+
+bei Start jeder App kommt folgender Fehler: 
+qemux86-64:/home# afm-util start webapps-annex
+ERROR:  cannot-start
+
+---> befehl journalctl zeigt kompletten output/systemd/agl-services usw., am besten nach afm durchsuchen etc
+
+output:
+Jan 08 11:04:54 qemux86-64 afm-system-daemon[300]:  ERROR: can't start system unit afm-appli-dashboard--0.1--main@.service for uid 0 [/usr/src/debug/af-main/master+gitAUTOINC+af8db35cc0-r0/git/src/afm-urun.c:268]
+
+journalctl -xu  afm-appli-dashboard--0.1--main@.service
+systemctl status afm-appli-dashboard--0.1--main@.service
+
+qemux86-64:/home# uname -a
+Linux qemux86-64 5.4.57-yocto-standard #1 SMP PREEMPT Mon Jun 29 03:06:40 UTC 2020 x86_64 x86_64 x86_64 GNU/Linux
+
+qemux86-64:/home# cat /etc/os-release 
+ID=poky-agl
+NAME="Automotive Grade Linux"
+VERSION="10.90.0+snapshot-20201204 (koi)"
+VERSION_ID=10.90.0-snapshot-20201204
+PRETTY_NAME="Automotive Grade Linux 10.90.0+snapshot-20201204 (koi)"
+
+
+Maybe use flounder or the one used within guide-documents ?
+
+from https://lists.automotivelinux.org/g/agl-dev-community/topic/57195627#7822
+
+
+helloworld-native-application depends on agl-service-helloworld (API
+'helloworld') but it's not installed by default in AGL images. So, you must grab
+it from here: https://git.automotivelinux.org/apps/agl-service-helloworld
+and install it too.
+
+When I tried to reproduce your issue, I also found a minor bug in
+helloworld-native-application (mess up with log file). Please use my latest
+commit from today:
+https://github.com/iotbzh/helloworld-native-application/commit/fe2c9589d6018176b08af9afadb489f86d534091
+
+So finally, it works as expected. Here's a capture of my test session:
+
+Build the 2 widgets from an AGL docker container where SDK is installed:
+-------------------------------------------------------
+# . /xdt/sdk/environment-setup-aarch64-agl-linux
+# git clone https://git.automotivelinux.org/apps/agl-service-helloworld
+# agl-service-helloworld/autobuild/agl/autobuild package
+# scp agl-service-helloworld/build/*.wgt root@h3ulcb:/tmp/
+# git clone https://github.com/iotbzh/helloworld-native-application.git
+# helloworld-native-application/autobuild/agl/autobuild package
+# scp helloworld-native-application/build/*.wgt root@h3ulcb:/tmp/
+-------------------------------------------------------
+
+Then install on the board:
+-------------------------------------------------------
+$ ssh root@h3ulcb
+root@h3ulcb:~# afm-util install /tmp/agl-service-helloworld.wgt
+{
+  "added":"agl-service-helloworld@1.0-7a5a796"
+}
+root@h3ulcb:~# afm-util install /tmp/helloworld-native-application.wgt
+{
+  "added":"helloworld-native-application@0.1-fe2c958"
+}
+-------------------------------------------------------
+
+And finally run the native app, which calls the verb 'ping' on helloworld API
+every 10s and appends the json result to a log file in /tmp.
+-------------------------------------------------------
+root@h3ulcb:~# afm-util start helloworld-native-application@0.1-fe2c958
+8323
+root@h3ulcb:~# tail -f /tmp/helloworld.log
+  }
+}{
+  "response":0,
+  "jtype":"afb-reply",
+  "request":{
+    "status":"success",
+    "info":"Ping count = 0",
+    "uuid":"29c3357f-2083-49a8-9597-3136120728d3"
+  }
+}{
+  "response":1,
+  "jtype":"afb-reply",
+  "request":{
+    "status":"success",
+    "info":"Ping count = 1"
+  }
+}
+...
+
+
+anderer Versuch mit User-Änderung:
+qemux86-64:/home# su - agl-driver
+qemux86-64:~$ afm-util start dashboard
+ERROR:  cannot-start
+qemux86-64:~$ whoami
+agl-driver
+qemux86-64:~$ afm-util ps
+[
+  {
+    "runid":1596,
+    "pids":[
+      1596
+    ],
+    "state":"running",
+    "id":"settings"
+  },
+...
+  {
+    "runid":839,
+    "pids":[
+      839
+    ],
+    "state":"running",
+    "id":"homescreen"
+  }
+]
+
+note for folder under /home: user 0: root and user 1001:agl-driver 
+
+folgendes klappt:
+cd /home/1001/app-data
+su - agl-driver
+afm-util kill homescreen
+afm-util start homescreen
+
+Veränderungen am Display sichtbar
+Like Bogdan said, journalctl is the command to check if there are
+any problems starting your application. Please also check config.xml to see
+if indeed you have the right permissions (urn:AGL:permission::public:display). 
+
+One thing that changed between the two release is that widgets to no
+longer need that version (`@X.Y`) at the end. Das ist die Erklärung für Koi, warum dieser Zusatz nicht mehr angezeigt wird
+
+die Apps sind schon recht alt:
+eine Möglichkeit: älteres AGL verwenden, ansonsten einfach selber ein widget bauen, das betriebseigene HomeScreen klappt ja auch
+
+
+11.1.
+hello-world-native-application versuchen auszuführen auf target board:
+
+hello-world-native-application geklont, fehler korrigiert (fprintf(fd,results), und autobuild pacakge ausgeführt, das.wgt-file ist erzeugt worden.
+Als nächstes den Binder/services kreieren bzw. downloaden:
+ 
+die App helloworld-native läuft nach obiger Vorgehensweise, obwohl nach kurzer Zeit fehler im ssh-Therminal angezeigt wird, im Hintergrund weiter und ping count zählt wie erwünscht alle 10s hoch
+auf dem Display erscheint nichts, ist auch nicht so vorgesehen.
+
+next: probieren ob statt "agl-service.wgt" auch einfaches binding klappt.
+anhand hello-wworld-app in ps -efZ usw. nachspielen und die Infos des Manuals rauslesen
+
+
+21.1.:
+zum kompilieren:
+source agl/sdk/env..
+export LIBRARAY_PATH=/home/gast/local/lib/pkg_config:/home/gast/local/lib:$LIBRARY_PATH
+ldconfig
+gcc- Wall -g3 source.c -o source $(pkg-config --cflags --libs afb-daemon libafbwsc) -I/home/gast/....../corei7-64-agl-linux/usr/include
+
+Ausführen:
+export LD_LIBRARY_PATH=/home/gast/local/lib:$LD_LIBRARY_PATH
+
+28.1.
+app application-list testen
+ hier fehler "unit file" ?
+ 
+ -- Logs begin at Thu 2021-01-28 12:21:13 UTC. --
+Jan 28 13:17:09 qemux86-64 systemd[1]: /lib/systemd/system/cynagora-agent.socket:3: ListenStream= references a path below legacy directory /var/run/, updating /var/run/cynagora/cynagora.agent → /run/cynagora/cynagora.agent; please update the unit file accordingly.
+Jan 28 13:17:09 qemux86-64 systemd[1]: /lib/systemd/system/cynagora-admin.socket:3: ListenStream= references a path below legacy directory /var/run/, updating /var/run/cynagora/cynagora.admin → /run/cynagora/cynagora.admin; please update the unit file accordingly.
+Jan 28 13:17:09 qemux86-64 systemd[1]: Stopped target Sockets.
+Jan 28 13:17:09 qemux86-64 systemd[1]: Stopping Sockets.
+Jan 28 13:17:09 qemux86-64 systemd[1]: Reached target Sockets.
+Jan 28 13:17:25 qemux86-64 afm-system-daemon[299]:  ERROR: can't start system unit afm-appli-webapps-memory-match--1.1--main@.service for uid 1001 [/usr/src/debug/af-main/master+gitAUTOINC+af8db35cc0-r0/git/src/afm-urun.c:268]
+Jan 28 13:17:31 qemux86-64 afm-system-daemon[299]:  ERROR: can't start system unit afm-appli-webapps-memory-match--1.1--main@.service for uid 1001 [/usr/src/debug/af-main/master+gitAUTOINC+af8db35cc0-r0/git/src/afm-urun.c:268]
+Jan 28 13:17:40 qemux86-64 audit[1353]: AVC lsm=SMACK fn=smack_inode_permission action=denied subject="System" object="_" requested=wx pid=1353 comm="sh" name="1001" dev="vda" ino=973
+Jan 28 13:17:40 qemux86-64 su[1352]: pam_unix(su:session): session closed for user agl-driver
+Jan 28 13:17:40 qemux86-64 kernel: audit: type=1400 audit(1611839860.287:11): lsm=SMACK fn=smack_inode_permission action=denied subject="System" object="_" requested=wx pid=1353 comm="sh" name="1001" dev="vda" ino=973
+
+
+before:
+qemux86-64:/home# cat /lib/systemd/system/cynagora-agent.socket 
+[Socket]
+FileDescriptorName=agent
+ListenStream=/var/run/cynagora/cynagora.agent
+SocketUser=cynagora
+SocketGroup=cynagora
+SocketMode=0660
+SmackLabelIPIn=@
+SmackLabelIPOut=@
+
+Service=cynagora.service
+
+[Unit]
+Wants=cynagora.target
+Before=cynagora.target
+
+[Install]
+WantedBy=sockets.target
+
+Afterwards:
+qemux86-64:/home# vim /lib/systemd/system/cynagora-agent.socket 
+qemux86-64:/home# cat /lib/systemd/system/cynagora-agent.socket 
+[Socket]
+FileDescriptorName=agent
+ListenStream=/run/cynagora/cynagora.agent
+SocketUser=cynagora
+SocketGroup=cynagora
+SocketMode=0660
+SmackLabelIPIn=@
+SmackLabelIPOut=@
+
+Service=cynagora.service
+
+[Unit]
+Wants=cynagora.target
+Before=cynagora.target
+
+[Install]
+WantedBy=sockets.target
+same for: /lib/systemd/system/gpsd.socket , /lib/systemd/system/cynagora-check.socket, /lib/systemd/system/cynagora-admin.socket 
+---> installing works now
+
+Jan 28 15:06:51 qemux86-64 afm-system-daemon[299]:  ERROR: can't start system unit afm-appli-webapps-memory-match--1.1--main@.service for uid 1001 [/usr/src/debug/af-main/master+gitAUTOINC+af8db35cc0-r0/git/src/afm-urun.c:268]
+Jan 28 15:06:57 qemux86-64 afm-system-daemon[299]:  ERROR: can't start system unit afm-appli-webapps-memory-match--1.1--main@.service for uid 1001 [/usr/src/debug/af-main/master+gitAUTOINC+af8db35cc0-r0/git/src/afm-urun.c:268]
+Jan 28 15:07:00 qemux86-64 audit[1530]: AVC lsm=SMACK fn=smack_inode_permission action=denied subject="System" object="_" requested=wx pid=1530 comm="sh" name="1001" dev="vda" ino=973
+
+andere applications wie dashboard funktionieren durchaus.
+qemux86-64:~# afm-util kill dashboard
+true
+qemux86-64:~# afm-util start dashboard
+1981
+qemux86-64:~# 
+emux86-64:~# journalctl -f
+-- Logs begin at Thu 2021-01-28 12:21:13 UTC. --
+Jan 28 16:02:50 qemux86-64 afbd-dashboard[1981]:  ERROR: can't open client socket for unix:/run/user/0/apis/ws/signal-composer [/usr/src/debug/af-binder/master+gitAUTOINC+1b6249810b-r0/git/src/afb-socket.c:352,afb_socket_open_scheme]
+Jan 28 16:02:50 qemux86-64 afbd-dashboard[1981]:  NOTICE: API monitor starting... [/usr/src/debug/af-binder/master+gitAUTOINC+1b6249810b-r0/git/src/afb-apiset.c:808,start_api]
+Jan 28 16:02:50 qemux86-64 afbd-dashboard[1981]:  INFO: API monitor started [/usr/src/debug/af-binder/master+gitAUTOINC+1b6249810b-r0/git/src/afb-apiset.c:827,start_api]
+Jan 28 16:02:50 qemux86-64 afbd-dashboard[1981]:  INFO: Alias for url=/monitoring to path=/usr/lib/afb/monitoring [/usr/src/debug/af-binder/master+gitAUTOINC+1b6249810b-r0/git/src/main-afb-daemon.c:299,init_alias]
+Jan 28 16:02:50 qemux86-64 afbd-dashboard[1981]:  NOTICE: Serving rootdir=/var/local/lib/afm/applications/dashboard uploaddir=. [/usr/src/debug/af-binder/master+gitAUTOINC+1b6249810b-r0/git/src/main-afb-daemon.c:401,start_http_server]
+Jan 28 16:02:50 qemux86-64 afbd-dashboard[1981]:  NOTICE: Listening interface *:30031 [/usr/src/debug/af-binder/master+gitAUTOINC+1b6249810b-r0/git/src/afb-hsrv.c:557,hsrv_itf_connect]
+Jan 28 16:02:50 qemux86-64 afbd-dashboard[1981]:  NOTICE: Browser URL= http://localhost:30031 [/usr/src/debug/af-binder/master+gitAUTOINC+1b6249810b-r0/git/src/main-afb-daemon.c:416,start_http_server]
+Jan 28 16:02:50 qemux86-64 afbd-dashboard[1981]:  NOTICE: Listening interface localuser--31:8080 [/usr/src/debug/af-binder/master+gitAUTOINC+1b6249810b-r0/git/src/afb-hsrv.c:557,hsrv_itf_connect]
+Jan 28 16:02:50 qemux86-64 systemd[1]: Started This is a demo dashboard application.
+Jan 28 16:02:50 qemux86-64 afbd-launcher[847]: app_id:  dashboard
+Jan 28 16:03:07 qemux86-64 connmand[311]: ntp: adjust (slew): -0.005442 sec
+
+
+evtl: für application immer ein binder nötig, wegen websocket.
+schauen ob noch tic-tac-toe-socket da ist und dann testen ?
+
+für dashboard:	https://wiki.automotivelinux.org/agl-demonstrator/dashboard
+
+build helloworld-html-application:
+source sdk/environm...
+sudo apt-get install npm
+sudo npm install gulp -g
+
+then continue as in readme said -------->  build klappt nicht, aber der fakt, dass App und Binding in selbem Ordner vorhanden sind, deutet darauf hin, dass app nur mit binder klappt
+--> nochmal tic-tac-toe testen ?! oder helloworld wie früher ohne graphische UI
+
+
+aus pdf-Presentation Building application:
+- AGL-Framework, short: AF, is made of two parts: AF-Main (AFM, responsible for controlling apps) and AF-Binder (AFB, responsible as server for the backend like http,WS, etc.)
+- Application consists of three parts: 1.) backend binder/service		2.) frontend application	3.) configuration file 
+
+Vorgehen:
+ich versuche lokal HelloWorld auszuführen mit html
+wenn das klappt versuche ich es als .wgt zu verpacken und auf board auszuführen
+
+
+helloworld-binding und -app unter:	~/agl/agl-srv-helwor
+
+loud@Cloud-Lab:~/agl/agl-srv-helwor/agl-service-helloworld/helloworld-skeleton$ gcc -fPIC -shared helloworld-service-binding.c -o helloworld_service.so $(pkg-config --cflags-only-I afb-daemon) -I/home/cloud/agl/sdk/sysroots/corei7-64-agl-linux/usr/include/
+
+in terminal 1:
+cloud@Cloud-Lab:~/agl/agl-srv-helwor/agl-service-helloworld/helloworld-skeleton$ ./../../../binder_selftest/app-framework-binder/build/src/afb-daemon --binding ./helloworld_service.so --port 4444 --token ''
+
+in terminal 2:
+cloud@Cloud-Lab:~/agl$ ./binder_selftest/app-framework-binder/build/src/afb-client-demo --human 'localhost:4444/api?token='
+helloworld ping
+
+
+test klappt, jetzt mit html-Seite versuchen 
+~/agl/agl-srv-helwor/agl-service-helloworld/helloworld-skeleton$ ./../../../binder_selftest/app-framework-binder/build/src/afb-daemon --binding ./helloworld_service.so --port 4444 --token '' --roothttp=/home/cloud/agl/agl-srv-helwor/agl-service-helloworld/htdocs
+
+im browser: http://localhost:4444/index.html
+
+dieser test klappt, als nächstes eine App basteln
+
+aus Forum:
+In few words: put the files in a sub-directory named 'htdocs' then
+create the config.xml file according to [1].
+zip all that as a widget that you can install using 'afm-util install X'
+
+[1]
+http://docs.automotivelinux.org/docs/apis_services/en/dev/reference/af-main/2.2-config.xml.html
+
+Actually the problem is that your app will not be shown because it is
+not integrated with the homescreen and the window manager. To bypass
+this restriction, we usually replace the app POI (point of interest).
+To do so just set the id to "poi" and the version to "0.1".
+
+
+----> app erscheint evtl nicht auf homescreen, weil nicht eingebettet !?
+
+~/agl/agl-srv-helwor/selftest_app$ wgtpkg-pack -f -o self_hellow.wgt package
+
+
+zum App-Build folgende Ordner-Struktur beachten:
+loud@Cloud-Lab:~/agl/agl-srv-helwor/selftest_app$ ls package
+config.xml  htdocs  lib
+cloud@Cloud-Lab:~/agl/agl-srv-helwor/selftest_app$ ls package/htdocs/
+AFB-websock.js  assets  CMakeLists.txt  index.html  iotbzh-Binding.css  iotbzh-Binding.js
+cloud@Cloud-Lab:~/agl/agl-srv-helwor/selftest_app$ ls package/lib/
+helloworld_service.so
+cloud@Cloud-Lab:~/agl/agl-srv-helwor/selftest_app$ 
+
+dann ausführen: cloud@Cloud-Lab:~/agl/agl-srv-helwor/selftest_app$ wgtpkg-pack -f -o self_hellow.wgt package
+
+----> auf dem Homscreen erscheint die self-helloworld-app mit s als angezeigter Buchstabe !!!!!!!!!
+es zeigt immer noch "cannot-start" aber das ist auch bei Dashboard und wird dennoch ausgeführt 
+
+- Logs begin at Fri 2021-01-29 19:42:52 UTC. --
+Jan 29 20:00:55 qemux86-64 afbd-launcher[847]: will activate app:  "self_hellow"
+Jan 29 20:01:20 qemux86-64 su[1461]: Successful su for agl-driver by root
+Jan 29 20:01:20 qemux86-64 su[1461]: + /dev/ttyS1 root:agl-driver
+Jan 29 20:01:20 qemux86-64 su[1461]: pam_unix(su:session): session opened for user agl-driver by root(uid=0)
+Jan 29 20:01:20 qemux86-64 dbus-daemon[256]: [system] Rejected receive message, 1 matched rules; type="signal", sender="(unset)" ((bus)) interface="org.freedesktop.DBus" member="NameLost" error name="(unset)" requested_reply="0" destination=":1.49" (uid=0 pid=1461 comm="su - agl-driver " label="System") privilege="http://tizen.org/privilege/internal/dbus"
+Jan 29 20:02:05 qemux86-64 afm-system-daemon[300]:  ERROR: can't start system unit afm-appli-self_hellow--0.1--main@.service for uid 1001 [/usr/src/debug/af-main/master+gitAUTOINC+af8db35cc0-r0/git/src/afm-urun.c:268]
+Jan 29 20:02:56 qemux86-64 afm-system-daemon[300]:  ERROR: can't start system unit afm-appli-self_hellow--0.1--main@.service for uid 1001 [/usr/src/debug/af-main/master+gitAUTOINC+af8db35cc0-r0/git/src/afm-urun.c:268]
+Jan 29 20:02:59 qemux86-64 audit[1462]: AVC lsm=SMACK fn=smack_inode_permission action=denied subject="System" object="_" requested=wx pid=1462 comm="sh" name="1001" dev="vda" ino=973
+
+
+next: mehr über App-Anwendung googlen/anschauen etc.
+
+
+2.2.
+during start-up of new bzImage/qemu:
+eb 02 11:03:42 qemux86-64 afbd-homescreen[837]: ------BEGIN OF CONFIG-----
+Feb 02 11:03:42 qemux86-64 afbd-homescreen[837]: -- {
+Feb 02 11:03:42 qemux86-64 afbd-homescreen[837]: --    "name": "afbd-homescreen",
+Feb 02 11:03:42 qemux86-64 afbd-homescreen[837]: --    "rootdir": "/var/local/lib/afm/applications/homescreen",
+Feb 02 11:03:42 qemux86-64 afbd-homescreen[837]: --    "workdir": "/home/1001/app-data/homescreen",
+Feb 02 11:03:42 qemux86-64 afbd-homescreen[837]: --    "monitoring": true,
+Feb 02 11:03:42 qemux86-64 afbd-homescreen[837]: --    "port": 30032,
+Feb 02 11:03:42 qemux86-64 afbd-homescreen[837]: --    "interface": [
+Feb 02 11:03:42 qemux86-64 afbd-homescreen[837]: --      "tcp:localuser--32:8080"
+Feb 02 11:03:42 qemux86-64 afbd-homescreen[837]: --    ],
+Feb 02 11:03:42 qemux86-64 afbd-homescreen[837]: --    "roothttp": ".",
+Feb 02 11:03:42 qemux86-64 afbd-homescreen[837]: --    "ws-client": [
+Feb 02 11:03:42 qemux86-64 afbd-homescreen[837]: --      "unix:/run/user/1001/apis/ws/homescreen",
+Feb 02 11:03:42 qemux86-64 afbd-homescreen[837]: --      "unix:/run/user/1001/apis/ws/network-manager",
+Feb 02 11:03:42 qemux86-64 afbd-homescreen[837]: --      "unix:/run/user/1001/apis/ws/weather",
+Feb 02 11:03:42 qemux86-64 afbd-homescreen[837]: --      "unix:/run/user/1001/apis/ws/Bluetooth-Manager",
+Feb 02 11:03:42 qemux86-64 afbd-homescreen[837]: --      "unix:/run/user/1001/apis/ws/audiomixer",
+Feb 02 11:03:42 qemux86-64 afbd-homescreen[837]: --      "unix:/run/user/1001/apis/ws/vshl-core"
+Feb 02 11:03:42 qemux86-64 afbd-homescreen[837]: --    ],
+Feb 02 11:03:42 qemux86-64 afbd-homescreen[837]: --    "exec": [
+Feb 02 11:03:42 qemux86-64 afbd-homescreen[837]: --      "/var/local/lib/afm/applications/homescreen/bin/HomeScreen",
+Feb 02 11:03:42 qemux86-64 afbd-homescreen[837]: --      "@p",
+Feb 02 11:03:42 qemux86-64 afbd-homescreen[837]: --      "@t"
+Feb 02 11:03:42 qemux86-64 afbd-homescreen[837]: --    ],
+Feb 02 11:03:42 qemux86-64 afbd-homescreen[837]: --    "apitimeout": 20,
+Feb 02 11:03:42 qemux86-64 afbd-homescreen[837]: --    "cache-eol": 100000,
+Feb 02 11:03:42 qemux86-64 afbd-homescreen[837]: --    "cntxtimeout": 32000000,
+Feb 02 11:03:42 qemux86-64 afbd-homescreen[837]: --    "session-max": 200,
+Feb 02 11:03:42 qemux86-64 afbd-homescreen[837]: --    "uploaddir": ".",
+Feb 02 11:03:42 qemux86-64 afbd-homescreen[837]: --    "rootbase": "/opa",
+Feb 02 11:03:42 qemux86-64 afbd-homescreen[837]: --    "rootapi": "/api",
+Feb 02 11:03:42 qemux86-64 afbd-homescreen[837]: --    "ldpaths": [
+Feb 02 11:03:42 qemux86-64 afbd-homescreen[837]: --      "/usr/lib/afb"
+Feb 02 11:03:42 qemux86-64 afbd-homescreen[837]: --    ],
+Feb 02 11:03:42 qemux86-64 afbd-homescreen[837]: --    "alias": [
+Feb 02 11:03:42 qemux86-64 afbd-homescreen[837]: --      "/monitoring:/usr/lib/afb/monitoring"
+Feb 02 11:03:42 qemux86-64 afbd-homescreen[837]: --    ]
+Feb 02 11:03:42 qemux86-64 afbd-homescreen[837]: --  }
+Feb 02 11:03:42 qemux86-64 afbd-homescreen[837]: ------END OF CONFIG-----
+Feb 02 11:03:42 qemux86-64 afbd-homescreen[837]:  INFO: running with pid 837 [/usr/src/debug/af-binder/master+gitAUTOINC+1b6249810b-r0/git/src/main-afb-daemon.c:978,main]
+Feb 02 11:03:42 qemux86-64 afbd-homescreen[837]:  INFO: API monitor added [/usr/src/debug/af-binder/master+gitAUTOINC+1b6249810b-r0/git/src/afb-apiset.c:510,afb_apiset_add]
+Feb 02 11:03:42 qemux86-64 afbd-homescreen[837]:  INFO: Can't acces socket path /run/platform/supervisor: No such file or directory [/usr/src/debug/af-binder/master+gitAUTOINC+1b624>
+lines 1265-1287
+
+aus dem ~ - Ordner heraus habe ich memory-match.wgt installiert:
+qemux86-64:~# afm-util install memory-match.wgt 
+{
+  "added":"webapps-memory-match"
+}
+qemux86-64:~# journalctl -f
+-- Logs begin at Tue 2021-02-02 11:03:36 UTC. --
+Feb 02 11:18:45 qemux86-64 systemd[1]: /lib/systemd/system/cynagora-admin.socket:3: ListenStream= references a path below legacy directory /var/run/, updating /var/run/cynagora/cynagora.admin → /run/cynagora/cynagora.admin; please update the unit file accordingly.
+Feb 02 11:18:45 qemux86-64 systemd[1]: Stopped target Sockets.
+Feb 02 11:18:45 qemux86-64 systemd[1]: Stopping Sockets.
+Feb 02 11:18:45 qemux86-64 systemd[1]: Reached target Sockets.
+Feb 02 11:18:45 qemux86-64 afbd-agl-service-homescreen[847]:  INFO: [API homescreen] on_event afm-main/application-list-changed [/usr/src/debug/agl-service-homescreen/git-r0/git/src/homescreen.cpp:554,onevent]
+Feb 02 11:18:45 qemux86-64 afbd-homescreen[844]: WebSocket Text Received:  "[5,\"afm-main/application-list-changed\",{\"event\":\"afm-main/application-list-changed\",\"data\":{\"event\":\"afm-main/application-list-changed\",\"data\":{\"operation\":\"install\",\"data\":\"webapps-memory-match\"},\"jtype\":\"afb-event\"},\"jtype\":\"afb-event\"}]"
+Feb 02 11:18:45 qemux86-64 afbd-homescreen[844]: MasterVolume::onClientEventReceived[ "afm-main/application-list-changed" ]:  QJsonValue(object, QJsonObject({"data":{"data":"webapps-memory-match","operation":"install"},"event":"afm-main/application-list-changed","jtype":"afb-event"}))
+Feb 02 11:18:45 qemux86-64 afbd-agl-service-homescreen[847]:  INFO: [API homescreen] synchronous call, error=(null), info=(null). [/usr/src/debug/agl-service-homescreen/git-r0/git/src/hs-proxy.cpp:104,api_call_sync]
+Feb 02 11:18:45 qemux86-64 afbd-agl-service-homescreen[847]:  INFO: [API homescreen] called, event=application-list-changed. [/usr/src/debug/agl-service-homescreen/git-r0/git/src/hs-client.cpp:484,pushEvent]
+Feb 02 11:18:45 qemux86-64 afbd-launcher[845]: qml: applist update in Launcher.qml
+
+afm-util list:
+{
+    "description":"Memory match",
+    "name":"MemoryMatch",
+    "shortname":"",
+    "id":"webapps-memory-match",
+    "version":"1.1.7",
+    "author":"Todd Brandt <todd.e.brandt@intel.com>",
+    "author-email":"",
+    "width":"",
+    "height":"",
+    "icon":"/var/local/lib/afm/applications/webapps-memory-match/icon_128.png",
+    "http-port":30044
+  },
+  
+  wenn ich starten möchte:
+  Feb 02 11:22:47 qemux86-64 afm-system-daemon[300]:  ERROR: can't start system unit afm-appli-webapps-memory-match--1.1--main@.service for uid 0 [/usr/src/debug/af-main/master+gitAUTOINC+3ea6f4a404-r0/git/src/afm-urun.c:268]
+
+qemux86-64:~# systemctl start afm-appli-webapps-memory-match--1.1--main@.service
+Failed to start afm-appli-webapps-memory-match--1.1--main@.service: Unit name afm-appli-webapps-memory-match--1.1--main@.service is missing the instance name.
+See system logs and 'systemctl status afm-appli-webapps-memory-match--1.1--main@.service' for details.
+qemux86-64:~# systemctl status afm-appli-webapps-memory-match--1.1--main@.service
+Failed to get properties: Unit name afm-appli-webapps-memory-match--1.1--main@.service is neither a valid invocation ID nor unit name.
+
+
+<
+from:
+root@macbook:/home/julian/Desktop# systemctl start syncthing@
+Failed to start syncthing@.service: Unit name syncthing@.service is missing the instance name.
+-->
+The instance name is a single argument that can be passed to systemd units. In this case, it’s the user to run as. You might be looking for "systemctl enable syncthing@julian and systemctl start syncthing@julian."
+Added: There’s also the possibility of running it in the user manager, which is active when you’re logged in. That would mean using systemctl --user enable syncthing and systemctl --user start syncthing. (The enable in both cases is so that it gets automatically started at boot or login - but it doesn’t start it now, oddly enough.)
+>
+
+qemux86-64:~# systemctl enable afm-appli-webapps-memory-match--1.1--main@root
+The unit files have no installation config (WantedBy=, RequiredBy=, Also=,
+Alias= settings in the [Install] section, and DefaultInstance= for template
+units). This means they are not meant to be enabled using systemctl.
+ 
+Possible reasons for having this kind of units are:
+* A unit may be statically enabled by being symlinked from another unit's
+  .wants/ or .requires/ directory.
+* A unit's purpose may be to act as a helper for some other unit which has
+  a requirement dependency on it.
+* A unit may be started when needed via activation (socket, path, timer,
+  D-Bus, udev, scripted systemctl call, ...).
+* In case of template units, the unit is meant to be enabled with some
+  instance name specified.
+qemux86-64:~# systemctl start afm-appli-webapps-memory-match--1.1--main@root
+Failed to start afm-appli-webapps-memory-match--1.1--main@root.service: Unit afm-api-windowmanager@root.service not found.
+
+nach anpassen der /var/run Files, neuinstalliert und beim start gleichen Fehler
+qemux86-64:~# systemctl status afm-appli-webapps-memory-match--1.1--main@root.service
+* afm-appli-webapps-memory-match--1.1--main@root.service - Memory match
+     Loaded: loaded (/usr/local/lib/systemd/system/afm-appli-webapps-memory-match--1.1--main@.service; static; vendor preset: disabled)
+     Active: inactive (dead)
+
+
+unter ls -ll /usr/local/lib/systemd/system/  fehlt der servicewie ihn alle anderen apps haben: rw-r--r--. 1 root root 2850 Feb  2 11:03 afm-service-agl-service-hvac--1.0--main@.service
+
+hvac zeigt zwar "cannot-start" an aber display ändert sich.
+qemux86-64:~# journalctl -xe
+-- Subject: A start job for unit afm-service-agl-service-nfc--1.0--main@0.service has failed
+-- Defined-By: systemd
+-- Support: https://lists.freedesktop.org/mailman/listinfo/systemd-devel
+-- 
+-- A start job for unit afm-service-agl-service-nfc--1.0--main@0.service has finished with a failure.
+-- 
+-- The job identifier is 6734 and the job result is failed.
+Feb 02 12:02:08 qemux86-64 systemd[1]: afm-api-nfc@0.socket: Failed with result 'service-start-limit-hit'.
+-- Subject: Unit failed
+-- Defined-By: systemd
+-- Support: https://lists.freedesktop.org/mailman/listinfo/systemd-devel
+-- 
+-- The unit afm-api-nfc@0.socket has entered the 'failed' state with result 'service-start-limit-hit'.
+Feb 02 12:02:08 qemux86-64 systemd[1]: Reached target afm-user-session 0.
+-- Subject: A start job for unit afm-user-session@0.target has finished successfully
+-- Defined-By: systemd
+-- Support: https://lists.freedesktop.org/mailman/listinfo/systemd-devel
+-- 
+-- A start job for unit afm-user-session@0.target has finished successfully.
+-- 
+-- The job identifier is 3849.
+Feb 02 12:02:08 qemux86-64 afbd-launcher[845]: app_id:  hvac
+Feb 02 12:03:59 qemux86-64 afm-system-daemon[300]:  ERROR: can't start system unit afm-appli-webapps-memory-match--1.1--main@.service for uid 0 [/usr/src/debug/af-main/master+gitAUT>
+
+( weitere quelle agl: https://github.com/webmaxru/agl-hvac)
+drwx------. 2 agl-driver agl-driver 4096 Feb  2 11:03 agl-service-hvac liegt unter app-data und fehlt evtl für helloworld?!
+
+qemux86-64:/home# journalctl | grep afbd-hvac
+Feb 02 12:00:44 qemux86-64 afbd-hvac[1420]: /bin/mkdir: cannot create directory '/home/root': Permission denied
+Feb 02 12:01:35 qemux86-64 afbd-hvac[1436]: /bin/mkdir: cannot create directory '/home/root': Permission denied
+Feb 02 12:02:06 qemux86-64 afbd-hvac[1508]: ------BEGIN OF CONFIG-----
+Feb 02 12:02:06 qemux86-64 afbd-hvac[1508]: -- {
+Feb 02 12:02:06 qemux86-64 afbd-hvac[1508]: --    "name": "afbd-hvac",
+Feb 02 12:02:06 qemux86-64 afbd-hvac[1508]: --    "rootdir": "/var/local/lib/afm/applications/hvac",
+Feb 02 12:02:06 qemux86-64 afbd-hvac[1508]: --    "workdir": "/home/0/app-data/hvac",
+Feb 02 12:02:06 qemux86-64 afbd-hvac[1508]: --    "monitoring": true,
+Feb 02 12:02:06 qemux86-64 afbd-hvac[1508]: --    "port": 30033,
+Feb 02 12:02:06 qemux86-64 afbd-hvac[1508]: --    "interface": [
+Feb 02 12:02:06 qemux86-64 afbd-hvac[1508]: --      "tcp:localuser--33:8080"
+Feb 02 12:02:06 qemux86-64 afbd-hvac[1508]: --    ],
+Feb 02 12:02:06 qemux86-64 afbd-hvac[1508]: --    "roothttp": ".",
+Feb 02 12:02:06 qemux86-64 afbd-hvac[1508]: --    "ws-client": [
+Feb 02 12:02:06 qemux86-64 afbd-hvac[1508]: --      "unix:/run/user/0/apis/ws/HVAC"
+Feb 02 12:02:06 qemux86-64 afbd-hvac[1508]: --    ],
+Feb 02 12:02:06 qemux86-64 afbd-hvac[1508]: --    "exec": [
+Feb 02 12:02:06 qemux86-64 afbd-hvac[1508]: --      "/var/local/lib/afm/applications/hvac/bin/hvac",
+Feb 02 12:02:06 qemux86-64 afbd-hvac[1508]: --      "@p",
+Feb 02 12:02:06 qemux86-64 afbd-hvac[1508]: --      "@t"
+Feb 02 12:02:06 qemux86-64 afbd-hvac[1508]: --    ],
+Feb 02 12:02:06 qemux86-64 afbd-hvac[1508]: --    "apitimeout": 20,
+Feb 02 12:02:06 qemux86-64 afbd-hvac[1508]: --    "cache-eol": 100000,
+Feb 02 12:02:06 qemux86-64 afbd-hvac[1508]: --    "cntxtimeout": 32000000,
+Feb 02 12:02:06 qemux86-64 afbd-hvac[1508]: --    "session-max": 200,
+Feb 02 12:02:06 qemux86-64 afbd-hvac[1508]: --    "uploaddir": ".",
+Feb 02 12:02:06 qemux86-64 afbd-hvac[1508]: --    "rootbase": "/opa",
+Feb 02 12:02:06 qemux86-64 afbd-hvac[1508]: --    "rootapi": "/api",
+Feb 02 12:02:06 qemux86-64 afbd-hvac[1508]: --    "ldpaths": [
+Feb 02 12:02:06 qemux86-64 afbd-hvac[1508]: --      "/usr/lib/afb"
+Feb 02 12:02:06 qemux86-64 afbd-hvac[1508]: --    ],
+Feb 02 12:02:06 qemux86-64 afbd-hvac[1508]: --    "alias": [
+Feb 02 12:02:06 qemux86-64 afbd-hvac[1508]: --      "/monitoring:/usr/lib/afb/monitoring"
+Feb 02 12:02:06 qemux86-64 afbd-hvac[1508]: --    ]
+Feb 02 12:02:06 qemux86-64 afbd-hvac[1508]: --  }
+Feb 02 12:02:06 qemux86-64 afbd-hvac[1508]: ------END OF CONFIG-----
+Feb 02 12:02:06 qemux86-64 afbd-hvac[1508]:  INFO: running with pid 1508 [/usr/src/debug/af-binder/master+gitAUTOINC+1b6249810b-r0/git/src/main-afb-daemon.c:978,main]
+Feb 02 12:02:06 qemux86-64 afbd-hvac[1508]:  INFO: API monitor added [/usr/src/debug/af-binder/master+gitAUTOINC+1b6249810b-r0/git/src/afb-apiset.c:510,afb_apiset_add]
+Feb 02 12:02:06 qemux86-64 afbd-hvac[1508]:  INFO: Can't acces socket path /run/platform/supervisor: No such file or directory [/usr/src/debug/af-binder/master+gitAUTOINC+1b6249810b-r0/git/src/afb-supervision.c:165,try_connect_supervisor]
+Feb 02 12:02:06 qemux86-64 afbd-hvac[1508]:  INFO: Scanning dir=[/usr/lib/afb] for bindings [/usr/src/debug/af-binder/master+gitAUTOINC+1b6249810b-r0/git/src/afb-api-so.c:193,adddirs]
+Feb 02 12:02:06 qemux86-64 afbd-hvac[1508]:  INFO: Scanning dir=[/usr/lib/afb/monitoring] for bindings [/usr/src/debug/af-binder/master+gitAUTOINC+1b6249810b-r0/git/src/afb-api-so.c:193,adddirs]
+Feb 02 12:02:06 qemux86-64 afbd-hvac[1508]:  INFO: API HVAC added [/usr/src/debug/af-binder/master+gitAUTOINC+1b6249810b-r0/git/src/afb-apiset.c:510,afb_apiset_add]
+Feb 02 12:02:06 qemux86-64 afbd-hvac[1508]:  NOTICE: API HVAC starting... [/usr/src/debug/af-binder/master+gitAUTOINC+1b6249810b-r0/git/src/afb-apiset.c:808,start_api]
+Feb 02 12:02:06 qemux86-64 afbd-hvac[1508]:  INFO: API HVAC started [/usr/src/debug/af-binder/master+gitAUTOINC+1b6249810b-r0/git/src/afb-apiset.c:827,start_api]
+Feb 02 12:02:06 qemux86-64 afbd-hvac[1508]:  NOTICE: API monitor starting... [/usr/src/debug/af-binder/master+gitAUTOINC+1b6249810b-r0/git/src/afb-apiset.c:808,start_api]
+Feb 02 12:02:06 qemux86-64 afbd-hvac[1508]:  INFO: API monitor started [/usr/src/debug/af-binder/master+gitAUTOINC+1b6249810b-r0/git/src/afb-apiset.c:827,start_api]
+Feb 02 12:02:06 qemux86-64 afbd-hvac[1508]:  INFO: Alias for url=/monitoring to path=/usr/lib/afb/monitoring [/usr/src/debug/af-binder/master+gitAUTOINC+1b6249810b-r0/git/src/main-afb-daemon.c:299,init_alias]
+Feb 02 12:02:06 qemux86-64 afbd-hvac[1508]:  NOTICE: Serving rootdir=/var/local/lib/afm/applications/hvac uploaddir=. [/usr/src/debug/af-binder/master+gitAUTOINC+1b6249810b-r0/git/src/main-afb-daemon.c:401,start_http_server]
+Feb 02 12:02:06 qemux86-64 afbd-hvac[1508]:  NOTICE: Listening interface *:30033 [/usr/src/debug/af-binder/master+gitAUTOINC+1b6249810b-r0/git/src/afb-hsrv.c:557,hsrv_itf_connect]
+Feb 02 12:02:06 qemux86-64 afbd-hvac[1508]:  NOTICE: Browser URL= http://localhost:30033 [/usr/src/debug/af-binder/master+gitAUTOINC+1b6249810b-r0/git/src/main-afb-daemon.c:416,start_http_server]
+Feb 02 12:02:06 qemux86-64 afbd-hvac[1508]:  NOTICE: Listening interface localuser--33:8080 [/usr/src/debug/af-binder/master+gitAUTOINC+1b6249810b-r0/git/src/afb-hsrv.c:557,hsrv_itf_connect]
+Feb 02 12:02:06 qemux86-64 afbd-hvac[1514]: setting port: 30033 , token: "@t"
+Feb 02 12:02:06 qemux86-64 afbd-hvac[1514]: #### "/home/0/app-data/hvac" "/var/local/lib/afm/applications/hvac/bin"
+Feb 02 12:02:07 qemux86-64 afbd-hvac[1514]: qrc:/HVAC.qml:46:9: Unable to assign [undefined] to double
+Feb 02 12:02:07 qemux86-64 afbd-hvac[1514]: qml: Right Temp changed 15
+Feb 02 12:02:07 qemux86-64 afbd-hvac[1514]: qml: Left Temp changed 15
+Feb 02 13:28:12 qemux86-64 afbd-hvac[1849]: /bin/mkdir: cannot create directory '/home/root': Permission denied
+Feb 02 13:30:04 qemux86-64 afbd-hvac[1860]: /bin/mkdir: cannot stat '/home/root/app-data/hvac': Permission denied
+Feb 02 13:41:59 qemux86-64 afbd-hvac[1508]:  NOTICE: Received SIGTERM [/usr/src/debug/af-binder/master+gitAUTOINC+1b6249810b-r0/git/src/main-afb-daemon.c:203,on_sigterm]
+
+
+
+qemux86-64:/usr/local/lib/afm/applications# ls agl-service-hvac/
+bin  config.xml  etc  htdocs  icon.png	lib  var
+
+qemux86-64:/usr/local/lib/afm/applications/agl-service-hvac# cat config.xml 
+<?xml version="1.0" encoding="UTF-8"?>
+<widget xmlns="http://www.w3.org/ns/widgets" id="agl-service-hvac" version="1.0">
+	<name>agl-service-hvac</name>
+	<icon src="icon.png"/>
+	<content src="lib/libafm-hvac-binding.so" type="application/vnd.agl.service"/>
+	<description>Binding for HVAC interface</description>
+	<author> &lt;&gt;</author>
+	<license>APL2.0</license>
+
+	<feature name="urn:AGL:widget:required-permission">
+		<param name="urn:AGL:permission::public:hidden" value="required" />
+		<param name="urn:AGL:permission::public:no-htdocs" value="required" />
+		<param name="urn:AGL:permission::system:run-by-default" value="required" />
+		<param name="urn:AGL:permission::platform:can:write" value="required" />
+	</feature>
+
+	<feature name="urn:AGL:widget:provided-api">
+		<param name="HVAC" value="ws" />
+	</feature>
+
+	<feature name="urn:AGL:widget:required-api">
+		<param name="identity" value="ws" />
+		<param name="low-can" value="ws" />
+	</feature>
+
+	<feature name="urn:AGL:widget:required-binding">
+		<param name="lib/libafm-hvac-binding.so" value="local" />
+	</feature>
+</widget>
+
+
+qemux86-64:/usr/local/lib/afm/applications/agl-service-hvac# ls
+bin  config.xml  etc  htdocs  icon.png	lib  var
+qemux86-64:/usr/local/lib/afm/applications/agl-service-hvac# ls etc/
+qemux86-64:/usr/local/lib/afm/applications/agl-service-hvac# ls htdocs/
+qemux86-64:/usr/local/lib/afm/applications/agl-service-hvac# ls icon.png 
+icon.png
+qemux86-64:/usr/local/lib/afm/applications/agl-service-hvac# ls lib      
+libafm-hvac-binding.so
+qemux86-64:/usr/local/lib/afm/applications/agl-service-hvac# ls var
+qemux86-64:/usr/local/lib/afm/applications/agl-service-hvac# 
+
+
+
+qemux86-64:/usr/local/lib/afm/applications/hvac# ls
+bin  config.xml  icon.svg  translations
+qemux86-64:/usr/local/lib/afm/applications/hvac# ls bin
+hvac
+qemux86-64:/usr/local/lib/afm/applications/hvac# cat config.xml 
+<?xml version="1.0" encoding="UTF-8"?>
+<widget xmlns="http://www.w3.org/ns/widgets" id="hvac" version="0.1">
+  <name>HVAC</name>
+  <icon src="icon.svg"/>
+  <content src="bin/hvac" type="application/vnd.agl.native"/>
+  <description>This is a demo application used to control and dialog with HVAC system</description>
+  <author>Romain Forlot &lt;romain.forlot@iot.bzh&gt;</author>
+  <license>APL 2.0</license>
+  <feature name="urn:AGL:widget:required-api">
+    <param name="HVAC" value="ws" />
+  </feature>
+  <feature name="urn:AGL:widget:required-permission">
+    <param name="urn:AGL:permission::public:no-htdocs" value="required" />
+    <param name="urn:AGL:permission::public:display" value="required" />
+  </feature>
+</widget>
+
+check:	qemux86-64:/usr/local/lib/afm/applications/webapps-memory-match# cat /etc/afm/afm-unit.conf 
+
+
+--->
+now try again helloworld and keep focus on service <--> application, config-files etc.  (app-example with explaination:	https://github.com/abhijeetk/AFB-test )
+show running binders:	ps -ef | grep afb
+show bindings/shared object files:	qemux86-64:/# find . -name *.so | grep binding
+show running websockets:	qemux86-64:/# ls -Z . /run/user/0/apis/ws
+
+(starten mit hvac klappt jetzt?!)
+qemux86-64:/# journalctl -f
+-- Logs begin at Tue 2021-02-02 11:03:36 UTC. --
+Feb 02 15:06:47 qemux86-64 afbd-hvac[2179]:  NOTICE: Listening interface *:30033 [/usr/src/debug/af-binder/master+gitAUTOINC+1b6249810b-r0/git/src/afb-hsrv.c:557,hsrv_itf_connect]
+Feb 02 15:06:47 qemux86-64 afbd-hvac[2179]:  NOTICE: Browser URL= http://localhost:30033 [/usr/src/debug/af-binder/master+gitAUTOINC+1b6249810b-r0/git/src/main-afb-daemon.c:416,start_http_server]
+Feb 02 15:06:47 qemux86-64 afbd-hvac[2179]:  NOTICE: Listening interface localuser--33:8080 [/usr/src/debug/af-binder/master+gitAUTOINC+1b6249810b-r0/git/src/afb-hsrv.c:557,hsrv_itf_connect]
+Feb 02 15:06:47 qemux86-64 systemd[1]: Started This is a demo application used to control and dialog with HVAC system.
+Feb 02 15:06:47 qemux86-64 afbd-hvac[2180]: setting port: 30033 , token: "@t"
+Feb 02 15:06:47 qemux86-64 afbd-hvac[2180]: #### "/home/0/app-data/hvac" "/var/local/lib/afm/applications/hvac/bin"
+Feb 02 15:06:47 qemux86-64 afbd-hvac[2180]: qrc:/HVAC.qml:46:9: Unable to assign [undefined] to double
+Feb 02 15:06:47 qemux86-64 afbd-hvac[2180]: qml: Right Temp changed 15
+Feb 02 15:06:47 qemux86-64 afbd-hvac[2180]: qml: Left Temp changed 15
+Feb 02 15:06:48 qemux86-64 afbd-launcher[845]: app_id:  hvac
+
+
+qemux86-64:/# journalctl -xe
+Feb 02 15:06:47 qemux86-64 afbd-hvac[2179]:  INFO: Scanning dir=[/usr/lib/afb/monitoring] for bindings [/usr/src/debug/af-binder/master+gitAUTOINC+1b6249810b-r0/git/src/afb-api-so.c:193,adddirs]
+Feb 02 15:06:47 qemux86-64 afbd-hvac[2179]:  ERROR: can't open client socket for unix:/run/user/0/apis/ws/HVAC [/usr/src/debug/af-binder/master+gitAUTOINC+1b6249810b-r0/git/src/afb-socket.c:352,a>
+Feb 02 15:06:47 qemux86-64 afbd-hvac[2179]:  NOTICE: API monitor starting... [/usr/src/debug/af-binder/master+gitAUTOINC+1b6249810b-r0/git/src/afb-apiset.c:808,start_api]
+Feb 02 15:06:47 qemux86-64 afbd-hvac[2179]:  INFO: API monitor started [/usr/src/debug/af-binder/master+gitAUTOINC+1b6249810b-r0/git/src/afb-apiset.c:827,start_api]
+Feb 02 15:06:47 qemux86-64 afbd-hvac[2179]:  INFO: Alias for url=/monitoring to path=/usr/lib/afb/monitoring [/usr/src/debug/af-binder/master+gitAUTOINC+1b6249810b-r0/git/src/main-afb-daemon.c:29>
+Feb 02 15:06:47 qemux86-64 afbd-hvac[2179]:  NOTICE: Serving rootdir=/var/local/lib/afm/applications/hvac uploaddir=. [/usr/src/debug/af-binder/master+gitAUTOINC+1b6249810b-r0/git/src/main-afb-da>
+Feb 02 15:06:47 qemux86-64 afbd-hvac[2179]:  NOTICE: Listening interface *:30033 [/usr/src/debug/af-binder/master+gitAUTOINC+1b6249810b-r0/git/src/afb-hsrv.c:557,hsrv_itf_connect]
+Feb 02 15:06:47 qemux86-64 afbd-hvac[2179]:  NOTICE: Browser URL= http://localhost:30033 [/usr/src/debug/af-binder/master+gitAUTOINC+1b6249810b-r0/git/src/main-afb-daemon.c:416,start_http_server]
+Feb 02 15:06:47 qemux86-64 afbd-hvac[2179]:  NOTICE: Listening interface localuser--33:8080 [/usr/src/debug/af-binder/master+gitAUTOINC+1b6249810b-r0/git/src/afb-hsrv.c:557,hsrv_itf_connect]
+Feb 02 15:06:47 qemux86-64 systemd[1]: Started This is a demo application used to control and dialog with HVAC system.
+-- Subject: A start job for unit afm-appli-hvac--0.1--main@0.service has finished successfully
+-- Defined-By: systemd
+-- Support: https://lists.freedesktop.org/mailman/listinfo/systemd-devel
+-- 
+-- A start job for unit afm-appli-hvac--0.1--main@0.service has finished successfully.
+-- 
+-- The job identifier is 8051.
+Feb 02 15:06:47 qemux86-64 afbd-hvac[2180]: setting port: 30033 , token: "@t"
+Feb 02 15:06:47 qemux86-64 afbd-hvac[2180]: #### "/home/0/app-data/hvac" "/var/local/lib/afm/applications/hvac/bin"
+Feb 02 15:06:47 qemux86-64 afbd-hvac[2180]: qrc:/HVAC.qml:46:9: Unable to assign [undefined] to double
+Feb 02 15:06:47 qemux86-64 afbd-hvac[2180]: qml: Right Temp changed 15
+Feb 02 15:06:47 qemux86-64 afbd-hvac[2180]: qml: Left Temp changed 15
+Feb 02 15:06:48 qemux86-64 afbd-launcher[845]: app_id:  hvac
+
+qemux86-64:/# systemctl status afm-appli-hvac--0.1--main@0.service
+● afm-appli-hvac--0.1--main@0.service - This is a demo application used to control and dialog with HVAC system
+     Loaded: loaded (/usr/local/lib/systemd/system/afm-appli-hvac--0.1--main@.service; static; vendor preset: disabled)
+     Active: active (running) since Tue 2021-02-02 15:06:47 UTC; 2min 55s ago
+    Process: 2178 ExecStartPre=/bin/mkdir -p /home/0/app-data/hvac (code=exited, status=0/SUCCESS)
+   Main PID: 2179 (afbd-hvac)
+      Tasks: 4 (limit: 2385)
+     Memory: 58.7M
+     CGroup: /user.slice/user-0.slice/afm-appli-hvac--0.1--main@0.service
+             ├─2179 afbd-hvac
+             └─2180 /var/local/lib/afm/applications/hvac/bin/hvac 30033 @t
+
+Feb 02 15:06:47 qemux86-64 afbd-hvac[2179]:  NOTICE: Serving rootdir=/var/local/lib/afm/applications/hvac uploaddir=. [/usr/src/debug/af-binder/master+gitAUTOINC+1b6249810b-r0/git/src/main-afb-da>
+Feb 02 15:06:47 qemux86-64 afbd-hvac[2179]:  NOTICE: Listening interface *:30033 [/usr/src/debug/af-binder/master+gitAUTOINC+1b6249810b-r0/git/src/afb-hsrv.c:557,hsrv_itf_connect]
+Feb 02 15:06:47 qemux86-64 afbd-hvac[2179]:  NOTICE: Browser URL= http://localhost:30033 [/usr/src/debug/af-binder/master+gitAUTOINC+1b6249810b-r0/git/src/main-afb-daemon.c:416,start_http_server]
+Feb 02 15:06:47 qemux86-64 afbd-hvac[2179]:  NOTICE: Listening interface localuser--33:8080 [/usr/src/debug/af-binder/master+gitAUTOINC+1b6249810b-r0/git/src/afb-hsrv.c:557,hsrv_itf_connect]
+Feb 02 15:06:47 qemux86-64 systemd[1]: Started This is a demo application used to control and dialog with HVAC system.
+Feb 02 15:06:47 qemux86-64 afbd-hvac[2180]: setting port: 30033 , token: "@t"
+Feb 02 15:06:47 qemux86-64 afbd-hvac[2180]: #### "/home/0/app-data/hvac" "/var/local/lib/afm/applications/hvac/bin"
+Feb 02 15:06:47 qemux86-64 afbd-hvac[2180]: qrc:/HVAC.qml:46:9: Unable to assign [undefined] to double
+Feb 02 15:06:47 qemux86-64 afbd-hvac[2180]: qml: Right Temp changed 15
+Feb 02 15:06:47 qemux86-64 afbd-hvac[2180]: qml: Left Temp changed 15
+
+
+NOTE:	afm-appli-hvac--0.1--main@0.service  die "0" stat "root"  // außerdem bei bindings checken ob windowmanager verfügbar ist !!
+
+selbsttest:
+(evtl klappt hvac jetzt, weil ich zuvor unter agl-driver starten wollte?!)
+agl-dri+     848  0.0  0.3  13136  6228 ?        Ss   11:03   0:00 afbd-agl-service-hvac                                                                                                                                                                                                                                                                                                                                                                                                                                              
+root        2179  0.0  0.2  11812  5748 ?        Ss   15:06   0:00 afbd-hvac                                                                                                                                                                                                                                                                                                             
+root        2180  0.1  6.8 452932 139744 ?       Sl   15:06   0:00 /var/local/lib/afm/applications/hvac/bin/hvac 30033 @t
+root        2194  0.0  0.0   3068   632 ttyS1    S+   15:14   0:00 grep hvac
+
+qemux86-64:/# curl localhost:30033/api/hvac/get
+{"jtype":"afb-reply","request":{"status":"unknown-api","info":"api hvac not found (for verb get)"}}
+
+( more apps:	https://github.com/ernice/CES2017/tree/master/apps)
+
+
+Feb 02 15:40:43 qemux86-64 afbd-hvac[2179]:  NOTICE: Unhandled request to /api/hvac/ [/usr/src/debug/af-binder/master+gitAUTOINC+1b6249810b-r0/git/src/afb-hsrv.c:253,access_handler]
+Feb 02 15:41:09 qemux86-64 afbd-hvac[2180]: qml: AirDown true
+Feb 02 15:41:09 qemux86-64 afbd-hvac[2180]: qml: AirDown false
+Feb 02 15:41:10 qemux86-64 afbd-hvac[2180]: qml: AirUp true
+
+nach uninstall und install von hvac, kann ich es per systemctl start ...@0.service starten, aber nicht über afm-util start..
+der service druckt aus:
+qemux86-64:/home/root# cat /usr/local/lib/systemd/system/afm-appli-hvac--0.1--main@.service 
+# auto generated by wgtpkg-unit for hvac version 0.1 target main of hvac
+
+[Unit]
+Description=This is a demo application used to control and dialog with HVAC system
+X-AFM-description=This is a demo application used to control and dialog with HVAC system
+X-AFM-name=HVAC
+X-AFM-shortname=
+X-AFM-id=hvac
+X-AFM-version=0.1
+X-AFM-author=Romain Forlot <romain.forlot@iot.bzh>
+X-AFM-author-email=
+X-AFM-width=
+X-AFM-height=
+X-AFM-icon=/var/local/lib/afm/applications/hvac/icon.svg
+X-AFM--ID=48
+X-AFM--target-name=main
+X-AFM--content=bin/hvac
+X-AFM--type=application/vnd.agl.native
+X-AFM--wgtdir=/var/local/lib/afm/applications/hvac
+X-AFM--workdir=/home/%i/app-data/hvac
+X-AFM--visibility=visible
+
+X-AFM--scope=user
+Requires=afm-user-session@%i.target
+After=user@%i.service
+BindsTo=weston@display.service
+After=weston@display.service
+# Adds check to smack
+ConditionSecurity=smack
+
+# Automatic bound to required api
+Requires=afm-api-HVAC@%i.service
+After=afm-api-HVAC@%i.service
+
+[Service]
+EnvironmentFile=-/etc/afm/unit.env.d/*
+EnvironmentFile=-/etc/afm/widget.env.d/hvac/*
+SmackProcessLabel=User::App::hvac
+SuccessExitStatus=0 SIGKILL
+UMask=0077
+User=%i
+Slice=user-%i.slice
+WorkingDirectory=-/home/%i/app-data/hvac
+ExecStartPre=/bin/mkdir -p /home/%i/app-data/hvac
+Environment=DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/%i/bus
+CapabilityBoundingSet=
+SupplementaryGroups=display
+SystemCallFilter=~@clock
+
+Environment=AFM_ID=hvac
+Environment=AFM_APP_INSTALL_DIR=/var/local/lib/afm/applications/hvac
+Environment=AFM_WORKDIR=/home/%i/app-data/hvac
+Environment=AFM_WSAPI_DIR=/run/user/%i/apis/ws
+Environment=PATH=/usr/sbin:/usr/bin:/sbin:/bin:/var/local/lib/afm/applications/hvac/bin
+Environment=LD_LIBRARY_PATH=/var/local/lib/afm/applications/hvac/lib
+Environment=XDG_DATA_HOME=/home/%i/app-data/hvac
+Environment=XDG_CONFIG_HOME=/home/%i/app-data/hvac
+Environment=XDG_CACHE_HOME=/home/%i/app-data/hvac
+Environment=XDG_RUNTIME_DIR=/run/user/%i
+EnvironmentFile=-/run/platform/debug/hvac.env
+SyslogIdentifier=afbd-hvac
+StandardInput=null
+StandardOutput=journal
+StandardError=journal
+X-AFM-http-port=30048
+Type=notify
+ExecStart=/usr/bin/afb-daemon \
+	--name afbd-hvac \
+	--rootdir=/var/local/lib/afm/applications/hvac \
+	--workdir=/home/%i/app-data/hvac \
+	--verbose \
+	--verbose \
+	--monitoring \
+	--port=30048 \
+	--interface=tcp:localuser--48:8080 \
+	--roothttp=. \
+		--ws-client=unix:/run/user/%i/apis/ws/HVAC \
+	--exec /var/local/lib/afm/applications/hvac/bin/hvac @p @t
+
+
+----------------> vermutlich für self_HVAC irgendwo ein Fehler im Path: unter /usr/local/lib/systemd/system/ fehlt afm-api-self_HVAC@%i.service
+
+qemux86-64:/# cat /usr/local/lib/systemd/system/afm-api-HVAC@.service 
+# auto generated by wgtpkg-unit for agl-service-hvac version 1.0 target main of agl-service-hvac
+[Unit]
+Description=Provides api HVAC for user %i
+X-AFM-API-TYPE=ws
+Requires=afm-user-setup@%i.service
+After=afm-user-setup@%i.service
+Requires=afm-api-HVAC@%i.socket
+After=afm-api-HVAC@%i.socket
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/true
+
+qemux86-64:/# cat /usr/local/lib/systemd/system/afm-api-HVAC@.socket  
+# auto generated by wgtpkg-unit for agl-service-hvac version 1.0 target main of agl-service-hvac
+[Unit]
+Description=Provides websocket api HVAC for user %i
+Requires=afm-user-setup@%i.service
+After=afm-user-setup@%i.service
+DefaultDependencies=no
+[Socket]
+SmackLabel=*
+SmackLabelIPIn=System
+SmackLabelIPOut=System
+ListenStream=/run/user/%i/apis/ws/HVAC
+FileDescriptorName=HVAC
+Service=afm-service-agl-service-hvac--1.0--main@%i.service
+
+
+falls nicht gleich klappt:  probieren afm-util kill <app-id>  und dann afm-util start <app-id>
+
+Fazit:
+wichtig die services durchzulesen, damit jeder path stimmt. services kann man auch über systemctl starten. Jedes application hat unterliegenden service. 
+afm-util kill/start hilft manchmal.
+
+( hvac quelle:	https://gerrit.automotivelinux.org/gerrit/gitweb?p=apps/hvac.git;a=tree;hb=b814a465a9583aa81ae7335d7adfd9df54db59cb )
+
+als nächstes: app self_hvac so anpassen, dass es vorinstallierten service nutzt aber graphisch meine ausgaben ausgibt.
+
+
+
+3.2.
+zum Test in self_HVAC habe ich die Bildbeschreibungen von HMI_HVAC_AirUp_Inactive und HMI_HVAC_RightChair_OFF vertauscht.
+Die Datei afm-appli-self_hvac--0.1--main@.service unter /usr/local/lib/systemd/system habe ich abgeändert, damit es die unten stehenden services einbindet.
+afm-api-HVAC@.service		  
+afm-api-HVAC@.socket
+Danach zeigt mir das Display bei afm-util start die Ausgabe "cannot-start" an aber die app erscheint, und die geänderten bilder werden angezeigt.
+( nur MediaPlayer öffnet sich bei klick im Display darauf) ---> könnte am windowmanager liegen ?!
+
+mit afm-util kill und start klappt das starten auch und eine Nummer ( = runid) erscheint 
+qemux86-64:/usr/local/lib/systemd/system# journalctl -f
+-- Logs begin at Wed 2021-02-03 10:43:50 UTC. --
+Feb 03 12:34:51 qemux86-64 afbd-self_hvac[1582]:  NOTICE: Listening interface *:30044 [/usr/src/debug/af-binder/master+gitAUTOINC+1b6249810b-r0/git/src/afb-hsrv.c:557,hsrv_itf_connect]
+Feb 03 12:34:51 qemux86-64 afbd-self_hvac[1582]:  NOTICE: Browser URL= http://localhost:30044 [/usr/src/debug/af-binder/master+gitAUTOINC+1b6249810b-r0/git/src/main-afb-daemon.c:416,start
+_http_server]
+Feb 03 12:34:51 qemux86-64 afbd-self_hvac[1582]:  NOTICE: Listening interface localuser--44:8080 [/usr/src/debug/af-binder/master+gitAUTOINC+1b6249810b-r0/git/src/afb-hsrv.c:557,hsrv_itf_
+connect]
+Feb 03 12:34:51 qemux86-64 systemd[1]: Started This is a selfmade demo application used to control and dialog with self_HVAC system.
+Feb 03 12:34:51 qemux86-64 afbd-self_hvac[1583]: setting port: 30044 , token: "@t"
+Feb 03 12:34:51 qemux86-64 afbd-self_hvac[1583]: #### "/home/0/app-data/self_hvac" "/var/local/lib/afm/applications/self_hvac/bin"
+Feb 03 12:34:51 qemux86-64 afbd-self_hvac[1583]: qrc:/HVAC.qml:46:9: Unable to assign [undefined] to double
+Feb 03 12:34:51 qemux86-64 afbd-self_hvac[1583]: qml: Right Temp changed 15
+Feb 03 12:34:51 qemux86-64 afbd-self_hvac[1583]: qml: Left Temp changed 15
+Feb 03 12:34:51 qemux86-64 afbd-launcher[848]: app_id:  hvac
+
+qemux86-64:/usr/local/lib/systemd/system# ps -ef | grep hvac
+agl-dri+     846       1  0 10:43 ?        00:00:00 afbd-agl-service hvac                                                     
+root        1582       1  0 12:34 ?        00:00:00 afbd-self_hvac
+root        1583    1582  0 12:34 ?        00:00:00 /var/local/lib/afm/applications/self_hvac/bin/hvac 30044 @t
+
+
+qemux86-64:/usr/local/lib/systemd/system# systemctl status afm-appli-self_hvac--0.1--main@0.service
+* afm-appli-self_hvac--0.1--main@0.service - This is a selfmade demo application used to control and dialog with self_HVAC system
+     Loaded: loaded (/usr/local/lib/systemd/system/afm-appli-self_hvac--0.1--main@.service; static; vendor preset: disabled)
+     Active: active (running) since Wed 2021-02-03 12:34:51 UTC; 10min ago
+    Process: 1581 ExecStartPre=/bin/mkdir -p /home/0/app-data/self_hvac (code=exited, status=0/SUCCESS)
+   Main PID: 1582 (afbd-self_hvac)
+      Tasks: 4 (limit: 2385)
+     Memory: 58.7M
+     CGroup: /user.slice/user-0.slice/afm-appli-self_hvac--0.1--main@0.service
+             |-1582 afbd-self_hvac
+             `-1583 /var/local/lib/afm/applications/self_hvac/bin/hvac 30044 @t
+
+Feb 03 12:34:51 qemux86-64 afbd-self_hvac[1582]:  NOTICE: Serving rootdir=/var/local/lib/afm/applications/self_hvac uploaddir=. [/usr/src/debug/af-binder/master+gitAUTOINC+1b6249810b-r0/>
+Feb 03 12:34:51 qemux86-64 afbd-self_hvac[1582]:  NOTICE: Listening interface *:30044 [/usr/src/debug/af-binder/master+gitAUTOINC+1b6249810b-r0/git/src/afb-hsrv.c:557,hsrv_itf_connect]
+Feb 03 12:34:51 qemux86-64 afbd-self_hvac[1582]:  NOTICE: Browser URL= http://localhost:30044 [/usr/src/debug/af-binder/master+gitAUTOINC+1b6249810b-r0/git/src/main-afb-daemon.c:416,star>
+Feb 03 12:34:51 qemux86-64 afbd-self_hvac[1582]:  NOTICE: Listening interface localuser--44:8080 [/usr/src/debug/af-binder/master+gitAUTOINC+1b6249810b-r0/git/src/afb-hsrv.c:557,hsrv_itf>
+Feb 03 12:34:51 qemux86-64 systemd[1]: Started This is a selfmade demo application used to control and dialog with self_HVAC system.
+Feb 03 12:34:51 qemux86-64 afbd-self_hvac[1583]: setting port: 30044 , token: "@t"
+Feb 03 12:34:51 qemux86-64 afbd-self_hvac[1583]: #### "/home/0/app-data/self_hvac" "/var/local/lib/afm/applications/self_hvac/bin"
+Feb 03 12:34:51 qemux86-64 afbd-self_hvac[1583]: qrc:/HVAC.qml:46:9: Unable to assign [undefined] to double
+Feb 03 12:34:51 qemux86-64 afbd-self_hvac[1583]: qml: Right Temp changed 15
+Feb 03 12:34:51 qemux86-64 afbd-self_hvac[1583]: qml: Left Temp changed 15
+
+zum WindowManager:
+The Window Manaer is the User Interface (UI) to control the Infotainment System. (check the docs for further details)
+
+agl zippen und auf github
+
+test mit helloworld-app:
+zuerst das agl-helloworld-service-binding installiert und erfolgreich gestartet:	qemux86-64:/home# afm-util install agl-service-helloworld.wgt 
+danach: helloworld-html installieren.
+
+qemux86-64:/home# systemctl start afm-appli-self_hellow--0.1--main@0.service
+Failed to start afm-appli-self_hellow--0.1--main@0.service: Unit afm-api-windowmanager@0.service not found.
+ ( ---> das bedeutet ich installiere erstmal den windowmanager)
+ 
+ 
+ qemux86-64:/home# cat /usr/local/lib/systemd/system/afm-appli-self_hellow--0.1--main@.service 
+# auto generated by wgtpkg-unit for self_hellow version 0.1 target main of self_hellow
+
+[Unit]
+Description=JUst for checking out
+X-AFM-description=JUst for checking out
+X-AFM-name=Self-HelloWorld-App
+X-AFM-shortname=
+X-AFM-id=self_hellow
+X-AFM-version=0.1
+X-AFM-author=Rolando Endero
+X-AFM-author-email=
+X-AFM-width=
+X-AFM-height=
+X-AFM-icon=/var/local/lib/afm/applications/self_hellow/iot-bzh-logo-small.png
+X-AFM--ID=47
+X-AFM--target-name=main
+X-AFM--content=index.html
+X-AFM--type=text/html
+X-AFM--wgtdir=/var/local/lib/afm/applications/self_hellow
+X-AFM--workdir=/home/%i/app-data/self_hellow
+X-AFM--visibility=visible
+
+X-AFM--scope=user
+Requires=afm-user-session@%i.target
+After=user@%i.service
+BindsTo=weston@display.service
+After=weston@display.service
+# Adds check to smack
+ConditionSecurity=smack
+
+# Automatic bound to required api
+Requires=afm-api-windowmanager@%i.service
+After=afm-api-windowmanager@%i.service
+Requires=afm-api-homescreen@%i.service
+After=afm-api-homescreen@%i.service
+Requires=afm-api-afm-main@%i.service
+After=afm-api-afm-main@%i.service
+
+[Service]
+EnvironmentFile=-/etc/afm/unit.env.d/*
+EnvironmentFile=-/etc/afm/widget.env.d/self_hellow/*
+SmackProcessLabel=User::App::self_hellow
+SuccessExitStatus=0 SIGKILL
+UMask=0077
+User=%i
+Slice=user-%i.slice
+WorkingDirectory=-/home/%i/app-data/self_hellow
+ExecStartPre=/bin/mkdir -p /home/%i/app-data/self_hellow
+Environment=DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/%i/bus
+CapabilityBoundingSet=
+SupplementaryGroups=display
+SupplementaryGroups=audio
+SystemCallFilter=~@clock
+
+Environment=AFM_ID=self_hellow
+Environment=AFM_APP_INSTALL_DIR=/var/local/lib/afm/applications/self_hellow
+Environment=AFM_WORKDIR=/home/%i/app-data/self_hellow
+Environment=AFM_WSAPI_DIR=/run/user/%i/apis/ws
+Environment=PATH=/usr/sbin:/usr/bin:/sbin:/bin:/var/local/lib/afm/applications/self_hellow/bin
+Environment=LD_LIBRARY_PATH=/var/local/lib/afm/applications/self_hellow/lib
+Environment=XDG_DATA_HOME=/home/%i/app-data/self_hellow
+Environment=XDG_CONFIG_HOME=/home/%i/app-data/self_hellow
+Environment=XDG_CACHE_HOME=/home/%i/app-data/self_hellow
+Environment=XDG_RUNTIME_DIR=/run/user/%i
+Environment=WAIT_FOR_HOST_SERVICE="1"
+EnvironmentFile=-/run/platform/debug/self_hellow.env
+SyslogIdentifier=afbd-self_hellow
+StandardInput=null
+StandardOutput=journal
+StandardError=journal
+X-AFM-http-port=30047
+Type=notify
+ExecStart=/usr/bin/afb-daemon \
+	--name afbd-self_hellow \
+	--rootdir=/var/local/lib/afm/applications/self_hellow \
+	--workdir=/home/%i/app-data/self_hellow \
+	--verbose \
+	--verbose \
+	--monitoring \
+	--port=30047 \
+	--interface=tcp:localuser--47:8080 \
+	--roothttp=. \
+	--alias=/icons:/var/local/lib/afm/icons \
+		--ws-client=unix:/run/user/%i/apis/ws/windowmanager \
+		--ws-client=unix:/run/user/%i/apis/ws/homescreen \
+		--ws-client=unix:/run/user/%i/apis/ws/afm-main \
+	--exec /usr/bin/cynagoauth-launch /usr/bin/web-runtime http://localuser--47:8080/index.html \
+	
+
+( -----> self_hellow Ordner unter /home/0/app-data/ fehlt ! 
+
+genauso folgender Ordner:
+qemux86-64:/home# ls /var/local/lib/afm/applications/self_hellow/
+config.xml  htdocs  lib
+qemux86-64:/home# ls /var/local/lib/afm/applications/self_hvac/  
+bin  config.xml  icon.svg  translations
+qemux86-64:/home# ls /var/local/lib/afm/applications/self_hvac/bin/
+hvac
+
+)
+
+ich habe windowmanager gebuildet, dazu habe ich erstens "python" laufbar gemacht, indem ich unter /usr/bin/python3.8 zu /usr/bin/python geändert habe
+und unter src/app.cpp den header "bits/signum.h" mit "signal.h" ersetzt hatte 
+[100%] Built target winman
+cloud@Cloud-Lab:~/agl/apps/windowmanager/windowmanager-HEAD-04cede8/build$ 
+
+cloud@Cloud-Lab:~/agl/apps/windowmanager/windowmanager-HEAD-04cede8/build$ make install
+[  9%] Built target afbclient
+[ 38%] Built target redraw_fixer
+[100%] Built target winman
+Install the project...
+-- Install configuration: ""
+-- Installing: /etc/layers.json
+CMake Error at cmake_install.cmake:49 (file):
+  file INSTALL cannot copy file
+  "/home/cloud/agl/apps/windowmanager/windowmanager-HEAD-04cede8/layers.json"
+  to "/etc/layers.json": Permission denied.
+
+Lösung:
+rüberkopieren auf display und nochmal "make install" ausführen ---> klappt nicht weil die Pfade auf diesen laptop eingestellt sind --> 
+todo: mehr Infos über windowmanager und wie es ausgeführt wird einholen  ---> evtl in alter version für qemu vorinstalliert ?
+das Binding windowmanager.so ausführen und eine service-datei schreiben
+
+
+5.2.:
+making WindowManager and hence helloWorld run
+
+qemux86-64:/var/local/lib/systemd/system# cat afm-api-HVAC@.service 
+# auto generated by wgtpkg-unit for agl-service-hvac version 1.0 target main of agl-service-hvac
+[Unit]
+Description=Provides api HVAC for user %i
+X-AFM-API-TYPE=ws
+Requires=afm-user-setup@%i.service
+After=afm-user-setup@%i.service
+Requires=afm-api-HVAC@%i.socket
+After=afm-api-HVAC@%i.socket
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/true
+
+
+qemux86-64:/var/local/lib/systemd/system# cat afm-api-HVAC@.socket  
+# auto generated by wgtpkg-unit for agl-service-hvac version 1.0 target main of agl-service-hvac
+[Unit]
+Description=Provides websocket api HVAC for user %i
+Requires=afm-user-setup@%i.service
+After=afm-user-setup@%i.service
+DefaultDependencies=no
+[Socket]
+SmackLabel=*
+SmackLabelIPIn=System
+SmackLabelIPOut=System
+ListenStream=/run/user/%i/apis/ws/HVAC
+FileDescriptorName=HVAC
+Service=afm-service-agl-service-hvac--1.0--main@%i.service
+
+
+
+
+
+agl-service-helloworld lässt sich starten:
+qemux86-64:/home# journalctl -f
+-- Logs begin at Fri 2021-02-05 10:37:25 UTC. --
+Feb 05 11:03:40 qemux86-64 afbd-agl-service-helloworld[1505]:  NOTICE: API helloworld-event starting... [/usr/src/debug/af-binder/master+gitAUTOINC+1b6249810b-r0/git/src/afb-apiset.c:808,start_api]
+Feb 05 11:03:40 qemux86-64 afbd-agl-service-helloworld[1505]:  INFO: API helloworld-event started [/usr/src/debug/af-binder/master+gitAUTOINC+1b6249810b-r0/git/src/afb-apiset.c:827,start_api]
+Feb 05 11:03:40 qemux86-64 afbd-agl-service-helloworld[1505]:  NOTICE: API monitor starting... [/usr/src/debug/af-binder/master+gitAUTOINC+1b6249810b-r0/git/src/afb-apiset.c:808,start_api]
+Feb 05 11:03:40 qemux86-64 afbd-agl-service-helloworld[1505]:  INFO: API monitor started [/usr/src/debug/af-binder/master+gitAUTOINC+1b6249810b-r0/git/src/afb-apiset.c:827,start_api]
+Feb 05 11:03:40 qemux86-64 afbd-agl-service-helloworld[1505]:  INFO: Alias for url=/monitoring to path=/usr/lib/afb/monitoring [/usr/src/debug/af-binder/master+gitAUTOINC+1b6249810b-r0/git/src/main-afb-daemon.c:299,init_alias]
+Feb 05 11:03:40 qemux86-64 afbd-agl-service-helloworld[1505]:  NOTICE: Serving rootdir=/var/local/lib/afm/applications/agl-service-helloworld uploaddir=. [/usr/src/debug/af-binder/master+gitA
+UTOINC+1b6249810b-r0/git/src/main-afb-daemon.c:401,start_http_server]
+Feb 05 11:03:40 qemux86-64 afbd-agl-service-helloworld[1505]:  NOTICE: Listening interface *:30045 [/usr/src/debug/af-binder/master+gitAUTOINC+1b6249810b-r0/git/src/afb-hsrv.c:557,hsrv_itf_co
+nnect]
+Feb 05 11:03:40 qemux86-64 afbd-agl-service-helloworld[1505]:  NOTICE: Browser URL= http://localhost:30045 [/usr/src/debug/af-binder/master+gitAUTOINC+1b6249810b-r0/git/src/main-afb-daemon.c:
+416,start_http_server]
+Feb 05 11:03:40 qemux86-64 afbd-agl-service-helloworld[1505]:  NOTICE: Listening interface localuser---45:8080 [/usr/src/debug/af-binder/master+gitAUTOINC+1b6249810b-r0/git/src/afb-hsrv.c:557
+,hsrv_itf_connect]
+Feb 05 11:03:40 qemux86-64 systemd[1]: Started Provide an AGL Helloworld Binding.
+
+
+unter  lib/systemd/system/ befindet sich afm-user-setup.service
+
+---------------NOTE: icon-Bilder müssen auf oberste Ebene laut service-file:X-AFM-icon=/var/local/lib/afm/applications/self_hellow/iot-bzh-logo-small.png
+
+aus service-file:
+X-AFM--scope=user
+Requires=afm-user-session@%i.target
+After=user@%i.service
+BindsTo=weston@display.service    		---> befindet sich unter sys/fs/cgroup/...
+After=weston@display.service
+# Adds check to smack
+ConditionSecurity=smack
+
+# Automatic bound to required api
+Requires=afm-api-windowmanager@%i.service
+After=afm-api-windowmanager@%i.service	----> fehlt / Frage ob wegen %i in usr/local... oder /sys/fs/cgro.. besser aufgehoben ?
+Requires=afm-api-homescreen@%i.service
+After=afm-api-homescreen@%i.service
+Requires=afm-api-afm-main@%i.service		---> unter /sys/fs/cgroup und /lib/systemd/system
+After=afm-api-afm-main@%i.service
+
+außerdem fehlend:	--ws-client=unix:/run/user/%i/apis/ws/windowmanager \
+
+
+was ich getan habe:	1.) unter /run/user/%i/apis/ws ordner windowmanager erstellt und eingefügt, mit gleiche rechten wie andere
+2.) dummy "afm-api-windowmanager@%i.service und ..socket" in usr/local.. eingefügt  ABER: es fehlt: "afm-service-agl-service-windowmanager--1.0--main@%i.service" in diesem File ist auch das Binding drin *.so
+
+< service und socket gespeichert unter: ~/agl/agl-srv-helwor$ cat afm-api-windowmanager@%i.service  und afm-service ..>
+---> klappt nicht so wirklich, evtl doch erstmal an HVAC halten, oder versuchen windowmanager für qemu zu installieren ?
+just skip windowmanager from service-file of self_hellow? --> dies hat den start ermöglicht, aber nur kurz im terminal zu sehen ,danach gleich wieder ausgegangen. 
+Am besten wird wohl sein sich in objektorientierte QT/C++ einzuarbeiten und die App HVAC zu übernehmen ?!
+
+9.2.: das nach genauer vorlage erstellte app self_app kann nicht installiert werden, wegen: 
+qemux86-64:/home# afm-util install self_app.wgt 
+ERROR:  failed installation failed: File exists
+---> mit HVAC arbeiten und "entkernen"
+
+die auf anderer ubuntu-session entwickelte app schlägt fehl:
+ications/hvac/bin/hvac: error while loading shared libraries: libQt5AGLExtras.so.1: cannot open shared object file: No such file 
+
+
+5.3.
+self_QML_v0.wgt testen  ---> vorher fehlt vermutlich binding
+qemux86-64:/home# systemctl start afm-appli-self_qml--0.1--main@0.service
+Failed to start afm-appli-self_qml--0.1--main@0.service: Unit afm-api-self_QML@0.service not found ---> auf qemu kann ich nicht ws-server.js laufen lassen, also binding selbst schreiben !
+
+8.3.:	mit dummy-binding (HVAC) startet self_qml-App aber Keyboard fehlt für Buchstabeneingabe/oder spracheingabe
+6.5.
+self_qml_binding und app2_self runtergeladen, mit Keyboard, jetzt testen -->  
+qemux86-64:/home# systemctl start afm-appli-self_qml--0.1--main@0.service
+Failed to start afm-appli-self_qml--0.1--main@0.service: Unit afm-api-self_QML@0.service not found.
+
+---> ich muss ein service file unter /lib/system/systemd oder /var/local/lib/systemd/system anlegen
+
+Vorlage:
+qemux86-64:/var/local/lib/systemd/system# cat afm-api-HVAC@.socket  
+# auto generated by wgtpkg-unit for agl-service-hvac version 1.0 target main of agl-service-hvac
+[Unit]
+Description=Provides websocket api HVAC for user %i
+Requires=afm-user-setup@%i.service
+After=afm-user-setup@%i.service
+DefaultDependencies=no
+[Socket]
+SmackLabel=*
+SmackLabelIPIn=System
+SmackLabelIPOut=System
+ListenStream=/run/user/%i/apis/ws/HVAC
+FileDescriptorName=HVAC
+Service=afm-service-agl-service-hvac--1.0--main@%i.service
+qemux86-64:/var/local/lib/systemd/system# cat afm-api-HVAC@.service 
+# auto generated by wgtpkg-unit for agl-service-hvac version 1.0 target main of agl-service-hvac
+[Unit]
+Description=Provides api HVAC for user %i
+X-AFM-API-TYPE=ws
+Requires=afm-user-setup@%i.service
+After=afm-user-setup@%i.service
+Requires=afm-api-HVAC@%i.socket
+After=afm-api-HVAC@%i.socket
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/true
+
+
+Erstmal dummy-service-file erstellen --> unter ~/agl: afm-api-self_QML@.service   und einfügen unter qemu:/var/local/....
+
+---> keyboard-input möglich :-)   
+mit binding testen:	afb-daemon --binding ./self_QML_binding.so --port 1234 --token 123456
+
+connect und send klappt ebenfalls wenn afb-daemon im Hintergrund läuft  :-)
+Idee:  für self_qml bei "ExecStart= afb-daemon --binding ..."   eingeben
+
+wiedergabe bei journalctl -xe:
+-- A start job for unit afm-appli-self_qml--0.1--main@0.service has begun execution.
+-- 
+-- The job identifier is 5922.
+May 06 08:31:49 qemux86-64 afbd-self_qml[1532]: ------BEGIN OF CONFIG-----
+May 06 08:31:49 qemux86-64 afbd-self_qml[1532]: -- {
+May 06 08:31:49 qemux86-64 afbd-self_qml[1532]: --    "name": "afbd-self_qml",
+May 06 08:31:49 qemux86-64 afbd-self_qml[1532]: --    "rootdir": "/var/local/lib/afm/applications/self_qml",
+May 06 08:31:49 qemux86-64 afbd-self_qml[1532]: --    "workdir": "/home/0/app-data/self_qml",
+May 06 08:31:49 qemux86-64 afbd-self_qml[1532]: --    "monitoring": true,
+May 06 08:31:49 qemux86-64 afbd-self_qml[1532]: --    "port": 30044,
+May 06 08:31:49 qemux86-64 afbd-self_qml[1532]: --    "interface": [
+May 06 08:31:49 qemux86-64 afbd-self_qml[1532]: --      "tcp:localuser--44:8080"
+May 06 08:31:49 qemux86-64 afbd-self_qml[1532]: --    ],
+May 06 08:31:49 qemux86-64 afbd-self_qml[1532]: --    "roothttp": ".",
+May 06 08:31:49 qemux86-64 afbd-self_qml[1532]: --    "ws-client": [
+May 06 08:31:49 qemux86-64 afbd-self_qml[1532]: --      "unix:/run/user/0/apis/ws/self_QML"
+May 06 08:31:49 qemux86-64 afbd-self_qml[1532]: --    ],
+May 06 08:31:49 qemux86-64 afbd-self_qml[1532]: --    "exec": [
+May 06 08:31:49 qemux86-64 afbd-self_qml[1532]: --      "/var/local/lib/afm/applications/self_qml/bin/self_qml",
+May 06 08:31:49 qemux86-64 afbd-self_qml[1532]: --      "@p",
+May 06 08:31:49 qemux86-64 afbd-self_qml[1532]: --      "@t"
+May 06 08:31:49 qemux86-64 afbd-self_qml[1532]: --    ],
+May 06 08:31:49 qemux86-64 afbd-self_qml[1532]: --    "apitimeout": 20,
+May 06 08:31:49 qemux86-64 afbd-self_qml[1532]: --    "cache-eol": 100000,
+May 06 08:31:49 qemux86-64 afbd-self_qml[1532]: --    "cntxtimeout": 32000000,
+May 06 08:31:49 qemux86-64 afbd-self_qml[1532]: --    "session-max": 200,
+May 06 08:31:49 qemux86-64 afbd-self_qml[1532]: --    "uploaddir": ".",
+May 06 08:31:49 qemux86-64 afbd-self_qml[1532]: --    "rootbase": "/opa",
+May 06 08:31:49 qemux86-64 afbd-self_qml[1532]: --    "rootapi": "/api",
+May 06 08:31:49 qemux86-64 afbd-self_qml[1532]: --    "ldpaths": [
+May 06 08:31:49 qemux86-64 afbd-self_qml[1532]: --      "/usr/lib/afb"
+May 06 08:31:49 qemux86-64 afbd-self_qml[1532]: --    ],
+May 06 08:31:49 qemux86-64 afbd-self_qml[1532]: --    "alias": [
+May 06 08:31:49 qemux86-64 afbd-self_qml[1532]: --      "/monitoring:/usr/lib/afb/monitoring"
+May 06 08:31:49 qemux86-64 afbd-self_qml[1532]: --    ]
+May 06 08:31:49 qemux86-64 afbd-self_qml[1532]: --  }
+May 06 08:31:49 qemux86-64 afbd-self_qml[1532]: ------END OF CONFIG-----
+May 06 08:31:49 qemux86-64 afbd-self_qml[1532]:  INFO: running with pid 1532 [/usr/src/debug/af-binder/master+gitAUTOINC+1b6249810b-r0/git/src/main-afb-daemon.c:978,main]
+May 06 08:31:49 qemux86-64 afbd-self_qml[1532]:  INFO: API monitor added [/usr/src/debug/af-binder/master+gitAUTOINC+1b6249810b-r0/git/src/afb-apiset.c:510,afb_apiset_add]
+May 06 08:31:49 qemux86-64 afbd-self_qml[1532]:  INFO: Can't acces socket path /run/platform/supervisor: No such file or directory [/usr/src/debug/af-binder/master+gitAUTOINC+1b6249810b-r0/gi>
+May 06 08:31:49 qemux86-64 afbd-self_qml[1532]:  INFO: Scanning dir=[/usr/lib/afb] for bindings [/usr/src/debug/af-binder/master+gitAUTOINC+1b6249810b-r0/git/src/afb-api-so.c:193,adddirs]
+May 06 08:31:49 qemux86-64 afbd-self_qml[1532]:  INFO: Scanning dir=[/usr/lib/afb/monitoring] for bindings [/usr/src/debug/af-binder/master+gitAUTOINC+1b6249810b-r0/git/src/afb-api-so.c:193,a>
+May 06 08:31:49 qemux86-64 afbd-self_qml[1532]:  ERROR: can't open client socket for unix:/run/user/0/apis/ws/self_QML [/usr/src/debug/af-binder/master+gitAUTOINC+1b6249810b-r0/git/src/afb-so>
+May 06 08:31:49 qemux86-64 afbd-self_qml[1532]:  NOTICE: API monitor starting... [/usr/src/debug/af-binder/master+gitAUTOINC+1b6249810b-r0/git/src/afb-apiset.c:808,start_api]
+May 06 08:31:49 qemux86-64 afbd-self_qml[1532]:  INFO: API monitor started [/usr/src/debug/af-binder/master+gitAUTOINC+1b6249810b-r0/git/src/afb-apiset.c:827,start_api]
+May 06 08:31:49 qemux86-64 afbd-self_qml[1532]:  INFO: Alias for url=/monitoring to path=/usr/lib/afb/monitoring [/usr/src/debug/af-binder/master+gitAUTOINC+1b6249810b-r0/git/src/main-afb-dae>
+May 06 08:31:49 qemux86-64 afbd-self_qml[1532]:  NOTICE: Serving rootdir=/var/local/lib/afm/applications/self_qml uploaddir=. [/usr/src/debug/af-binder/master+gitAUTOINC+1b6249810b-r0/git/src>
+May 06 08:31:49 qemux86-64 afbd-self_qml[1532]:  NOTICE: Listening interface *:30044 [/usr/src/debug/af-binder/master+gitAUTOINC+1b6249810b-r0/git/src/afb-hsrv.c:557,hsrv_itf_connect]
+May 06 08:31:49 qemux86-64 afbd-self_qml[1532]:  NOTICE: Browser URL= http://localhost:30044 [/usr/src/debug/af-binder/master+gitAUTOINC+1b6249810b-r0/git/src/main-afb-daemon.c:416,start_http>
+May 06 08:31:49 qemux86-64 afbd-self_qml[1532]:  NOTICE: Listening interface localuser--44:8080 [/usr/src/debug/af-binder/master+gitAUTOINC+1b6249810b-r0/git/src/afb-hsrv.c:557,hsrv_itf_conne>
+
+
+qemux86-64:/home# systemctl status afm-appli-self_qml--0.1--main@0.service
+* afm-appli-self_qml--0.1--main@0.service - This is a selfmade demo qml application
+     Loaded: loaded (/usr/local/lib/systemd/system/afm-appli-self_qml--0.1--main@.service; static; vendor preset: disabled)
+     Active: active (running) since Thu 2021-05-06 08:31:49 UTC; 7min ago
+    Process: 1531 ExecStartPre=/bin/mkdir -p /home/0/app-data/self_qml (code=exited, status=0/SUCCESS)
+   Main PID: 1532 (afbd-self_qml)
+      Tasks: 4 (limit: 2385)
+     Memory: 83.5M
+     CGroup: /user.slice/user-0.slice/afm-appli-self_qml--0.1--main@0.service
+             |-1532 afbd-self_qml
+             `-1533 /var/local/lib/afm/applications/self_qml/bin/self_qml 30044 @t
+
+May 06 08:32:01 qemux86-64 afbd-self_qml[1533]: "Could not convert argument 0 at"
+May 06 08:32:01 qemux86-64 afbd-self_qml[1533]:          "onClicked@qrc:/SingleKey.qml:93"
+May 06 08:32:01 qemux86-64 afbd-self_qml[1533]: "Passing incompatible arguments to C++ functions from JavaScript is dangerous and deprecated."
+May 06 08:32:01 qemux86-64 afbd-self_qml[1533]: "This will throw a JavaScript TypeError in future releases of Qt!"
+May 06 08:32:02 qemux86-64 afbd-self_qml[1533]: "Could not convert argument 0 at"
+May 06 08:32:02 qemux86-64 afbd-self_qml[1533]:          "onClicked@qrc:/SingleKey.qml:98"
+May 06 08:32:02 qemux86-64 afbd-self_qml[1533]: "Passing incompatible arguments to C++ functions from JavaScript is dangerous and deprecated."
+May 06 08:32:02 qemux86-64 afbd-self_qml[1533]: "This will throw a JavaScript TypeError in future releases of Qt!"
+May 06 08:32:05 qemux86-64 afbd-self_qml[1533]: QNativeSocketEngine::write() was not called in QAbstractSocket::ConnectedState
+May 06 08:32:06 qemux86-64 afbd-self_qml[1533]: QNativeSocketEngine::write() was not called in QAbstractSocket::ConnectedState
+
+
+/*
+zu Service eine MusterVorlage:
+Now what we have above is just rudimentary, here is a complete setup for spark:
+
+[Unit]
+Description=Apache Spark Master and Slave Servers
+After=network.target
+After=systemd-user-sessions.service
+After=network-online.target
+
+[Service]
+User=spark
+Type=forking
+ExecStart=/opt/spark-1.6.1-bin-hadoop2.6/sbin/start-all.sh
+ExecStop=/opt/spark-1.6.1-bin-hadoop2.6/sbin/stop-all.sh
+TimeoutSec=30
+Restart=on-failure
+RestartSec=30
+StartLimitInterval=350
+StartLimitBurst=10
+
+[Install]
+WantedBy=multi-user.target
+
+To setup the service:
+
+sudo systemctl start spark.service
+sudo systemctl stop spark.service
+sudo systemctl enable spark.service
+*/
+
+
+bei HVAC steht auch: ERROR: can't open client socket for unix:/run/user/0/apis/ws/HVAC
+qemux86-64:/home# afm-util start HVAC
+1579
+qemux86-64:/home# journalctl -xe
+-- A start job for unit afm-service-agl-service-hvac--1.0--main@0.service has finished with a failure.
+-- 
+-- The job identifier is 6789 and the job result is failed.
+May 06 08:51:26 qemux86-64 systemd[1]: afm-api-HVAC@0.socket: Failed with result 'service-start-limit-hit'.
+-- Subject: Unit failed
+-- Defined-By: systemd
+-- Support: https://lists.freedesktop.org/mailman/listinfo/systemd-devel
+-- 
+-- The unit afm-api-HVAC@0.socket has entered the 'failed' state with result 'service-start-limit-hit'.
+May 06 08:51:26 qemux86-64 afbd-hvac[1581]: #### "/home/0/app-data/hvac" "/var/local/lib/afm/applications/hvac/bin"
+May 06 08:51:26 qemux86-64 afbd-hvac[1581]: qrc:/HVAC.qml:46:9: Unable to assign [undefined] to double
+May 06 08:51:26 qemux86-64 afbd-hvac[1581]: qml: Right Temp changed 15
+May 06 08:51:26 qemux86-64 afbd-hvac[1581]: qml: Left Temp changed 15
+May 06 08:51:26 qemux86-64 afbd-launcher[846]: app_id:  hvac
+May 06 08:51:30 qemux86-64 afbd-hvac[1579]:  ERROR: can't open client socket for unix:/run/user/0/apis/ws/HVAC [/usr/src/debug/af-binder/master+gitAUTOINC+1b6249810b-r0/git/src/afb-socket.c:3>
+May 06 08:51:30 qemux86-64 afbd-hvac[1579]:  ERROR: can't open client socket for unix:/run/user/0/apis/ws/HVAC [/usr/src/debug/af-binder/master+gitAUTOINC+1b6249810b-r0/git/src/afb-socket.c:3>
+May 06 08:51:30 qemux86-64 afbd-hvac[1579]:  ERROR: can't open client socket for unix:/run/user/0/apis/ws/HVAC [/usr/src/debug/af-binder/master+gitAUTOINC+1b6249810b-r0/git/src/afb-socket.c:3>
+May 06 08:51:30 qemux86-64 afbd-hvac[1579]:  ERROR: can't open client socket for unix:/run/user/0/apis/ws/HVAC [/usr/src/debug/af-binder/master+gitAUTOINC+1b6249810b-r0/git/src/afb-socket.c:3>
+May 06 08:51:30 qemux86-64 afbd-hvac[1579]:  ERROR: can't open client socket for unix:/run/user/0/apis/ws/HVAC [/usr/src/debug/af-binder/master+gitAUTOINC+1b6249810b-r0/git/src/afb-socket.c:3>
+May 06 08:51:30 qemux86-64 afbd-hvac[1579]:  ERROR: can't open client socket for unix:/run/user/0/apis/ws/HVAC [/usr/src/debug/af-binder/master+gitAUTOINC+1b6249810b-r0/git/src/afb-socket.c:3>
+May 06 08:51:32 qemux86-64 afbd-hvac[1581]: qml: A/C true
+May 06 08:51:33 qemux86-64 afbd-hvac[1581]: qml: AUTO true
+May 06 08:51:34 qemux86-64 afbd-hvac[1581]: qml: Circulation true
+
+qemux86-64:/home# systemctl status afm-service-agl-service-hvac--1.0--main@0.service
+* afm-service-agl-service-hvac--1.0--main@0.service - Binding for HVAC interface
+     Loaded: loaded (/usr/local/lib/systemd/system/afm-service-agl-service-hvac--1.0--main@.service; disabled; vendor preset: disabled)
+     Active: failed (Result: exit-code) since Thu 2021-05-06 08:51:26 UTC; 2min 28s ago
+TriggeredBy: * afm-api-HVAC@0.socket
+    Process: 1591 ExecStartPre=/bin/mkdir -p /home/0/app-data/agl-service-hvac (code=exited, status=0/SUCCESS)
+    Process: 1592 ExecStart=/usr/bin/afb-daemon --name afbd-agl-service-hvac --rootdir=/var/local/lib/afm/applications/agl-service-hvac --workdir=/home/0/app-data/agl-service-hvac --verbose ->
+   Main PID: 1592 (code=exited, status=1/FAILURE)
+
+May 06 08:51:26 qemux86-64 afbd-agl-service-hvac[1592]:  NOTICE: API low-can starting... [/usr/src/debug/af-binder/master+gitAUTOINC+1b6249810b-r0/git/src/afb-apiset.c:808,start_api]
+May 06 08:51:26 qemux86-64 afbd-agl-service-hvac[1592]:  INFO: API low-can started [/usr/src/debug/af-binder/master+gitAUTOINC+1b6249810b-r0/git/src/afb-apiset.c:827,start_api]
+May 06 08:51:26 qemux86-64 afbd-agl-service-hvac[1592]:  NOTICE: API monitor starting... [/usr/src/debug/af-binder/master+gitAUTOINC+1b6249810b-r0/git/src/afb-apiset.c:808,start_api]
+May 06 08:51:26 qemux86-64 afbd-agl-service-hvac[1592]:  INFO: API monitor started [/usr/src/debug/af-binder/master+gitAUTOINC+1b6249810b-r0/git/src/afb-apiset.c:827,start_api]
+May 06 08:51:26 qemux86-64 systemd[1]: afm-service-agl-service-hvac--1.0--main@0.service: Main process exited, code=exited, status=1/FAILURE
+May 06 08:51:26 qemux86-64 systemd[1]: afm-service-agl-service-hvac--1.0--main@0.service: Failed with result 'exit-code'.
+May 06 08:51:26 qemux86-64 systemd[1]: Failed to start Binding for HVAC interface.
+May 06 08:51:26 qemux86-64 systemd[1]: afm-service-agl-service-hvac--1.0--main@0.service: Start request repeated too quickly.
+May 06 08:51:26 qemux86-64 systemd[1]: afm-service-agl-service-hvac--1.0--main@0.service: Failed with result 'exit-code'.
+May 06 08:51:26 qemux86-64 systemd[1]: Failed to start Binding for HVAC interface.
+
+qemux86-64:/home# cat /usr/local/lib/systemd/system/afm-service-agl-service-hvac--1.0--main@.service
+# auto generated by wgtpkg-unit for agl-service-hvac version 1.0 target main of agl-service-hvac
+
+[Unit]
+Description=Binding for HVAC interface
+X-AFM-description=Binding for HVAC interface
+X-AFM-name=agl-service-hvac
+X-AFM-shortname=
+X-AFM-id=agl-service-hvac
+X-AFM-version=1.0
+X-AFM-author= <>
+X-AFM-author-email=
+X-AFM-width=
+X-AFM-height=
+X-AFM-icon=/var/local/lib/afm/applications/agl-service-hvac/icon.png
+X-AFM--ID=13
+X-AFM--target-name=main
+X-AFM--content=lib/libafm-hvac-binding.so
+X-AFM--type=application/vnd.agl.service
+X-AFM--wgtdir=/var/local/lib/afm/applications/agl-service-hvac
+X-AFM--workdir=/home/%i/app-data/agl-service-hvac
+X-AFM--visibility=hidden
+
+X-AFM--scope=user
+Requires=afm-user-session@%i.target
+After=user@%i.service
+# Adds check to smack
+ConditionSecurity=smack
+
+# Automatic bound to required api
+Requires=afm-api-identity@%i.service
+After=afm-api-identity@%i.service
+Requires=afm-api-low-can@%i.service
+After=afm-api-low-can@%i.service
+Requires=afm-api-HVAC@%i.socket
+After=afm-api-HVAC@%i.socket
+
+[Service]
+EnvironmentFile=-/etc/afm/unit.env.d/*
+EnvironmentFile=-/etc/afm/widget.env.d/agl-service-hvac/*
+SmackProcessLabel=User::App::agl-service-hvac
+SuccessExitStatus=0 SIGKILL
+UMask=0077
+User=%i
+Slice=user-%i.slice
+WorkingDirectory=-/home/%i/app-data/agl-service-hvac
+ExecStartPre=/bin/mkdir -p /home/%i/app-data/agl-service-hvac
+Environment=DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/%i/bus
+CapabilityBoundingSet=
+SystemCallFilter=~@clock
+
+Environment=AFM_ID=agl-service-hvac
+Environment=AFM_APP_INSTALL_DIR=/var/local/lib/afm/applications/agl-service-hvac
+Environment=AFM_WORKDIR=/home/%i/app-data/agl-service-hvac
+Environment=AFM_WSAPI_DIR=/run/user/%i/apis/ws
+Environment=PATH=/usr/sbin:/usr/bin:/sbin:/bin:/var/local/lib/afm/applications/agl-service-hvac/bin
+Environment=LD_LIBRARY_PATH=/var/local/lib/afm/applications/agl-service-hvac/lib
+Environment=XDG_DATA_HOME=/home/%i/app-data/agl-service-hvac
+Environment=XDG_CONFIG_HOME=/home/%i/app-data/agl-service-hvac
+Environment=XDG_CACHE_HOME=/home/%i/app-data/agl-service-hvac
+Environment=XDG_RUNTIME_DIR=/run/user/%i
+EnvironmentFile=-/run/platform/debug/agl-service-hvac.env
+SyslogIdentifier=afbd-agl-service-hvac
+StandardInput=null
+StandardOutput=journal
+StandardError=journal
+X-AFM-http-port=30013
+Type=notify
+ExecStart=/usr/bin/afb-daemon \
+	--name afbd-agl-service-hvac \
+	--rootdir=/var/local/lib/afm/applications/agl-service-hvac \
+	--workdir=/home/%i/app-data/agl-service-hvac \
+	--verbose \
+	--verbose \
+	--monitoring \
+	--port=30013 \
+	--interface=tcp:localuser--13:8080 \
+	--roothttp=. \
+		--ws-client=unix:/run/user/%i/apis/ws/identity \
+		--ws-client=unix:/run/user/%i/apis/ws/low-can \
+		--binding=/var/local/lib/afm/applications/agl-service-hvac/lib/libafm-hvac-binding.so \
+		--ws-server=sd:HVAC \
+	
+
+[Install]
+WantedBy=afm-user-session@.target
+
+-----------------------------------------------------------------------------------------------------------------------
+wichtig: TriggeredBy: * afm-api-HVAC@0.socket  also sollte ich afm-api-self_QML.socket erstellen
+Im Socket wird verwiesen auf das "große" Service-File afm-service-agl-service-hvac--1.0--main@.service
+
+
+fehler "ERROR: can't open client socket for unix:/run/user/0/apis/ws/self_QML [/usr/src/debug/af-binder/master+gitAUTOINC+1b6249810b-r0/git/src/afb-socket.c:352,afb_socket_open_scheme]" evtl durch manuelles erstellen eines Websockets lösen?
+File-Struktur für self_QML anpassen und socket/service übernehmen
